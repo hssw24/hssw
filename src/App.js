@@ -2,7 +2,7 @@ import React from 'react';
 
 const App = () => {
   const links = [
-    { name: 'Names Counter', url: 'https://names-counter-2a.vercel.app/' },
+    { name: 'Names Zähler', url: 'https://names-counter-2a.vercel.app/' },
     { name: 'Silben Auswahl', url: 'https://silbenauswahl.vercel.app/' },
     { name: 'Zehner Plus', url: 'https://zehnerplus.vercel.app/' },
     { name: 'Obst One', url: 'https://obst-one.vercel.app/' },
