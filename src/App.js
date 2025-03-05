@@ -23,7 +23,7 @@ const App = () => {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <h3 className="text-4xl font-bold mb-8">Grundschule Afferde</h3>
+      <h5 className="text-4xl font-bold mb-8">Grundschule Afferde auf vercel.app</h5>
       <div className="flex flex-col gap-4">
         {links.map((link, index) => (
           <React.Fragment key={index}>
