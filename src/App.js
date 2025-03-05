@@ -3,19 +3,19 @@ import React from 'react';
 const App = () => {
   const links = [
     { label: '3. Klasse' },
-    { label: '10er-Übergang minus - Vorbereitung für "Schriftliche Subtraktion"', name: '10er-Übergang minus', url: 'https://10erm.vercel.app/' },
-    { label: 'Runden auf 10er', name: 'Runden auf 10er', url: 'https://rund10.vercel.app/' },
-    { label: 'Runden auf 100er', name: 'Runden auf 100er', url: 'https://rund100.vercel.app/' },
-    { label: 'Schriftliche Addition mit 3 Summanden - 100er und 10er', name: 'Schriftliche Addition mit 3 Summanden', url: 'https://saxx3s.vercel.app/' },
-    { label: 'Schriftliche Addition mit 2 Summanden - 100er uns 10er', name: 'Schriftliche Addition mit 2 Summanden', url: 'https://saxx23.vercel.app/' },
-    { label: 'Schriftliche Addition mit 2 Summanden - 100er', name: 'Schriftliche Addition mit 2 Summanden', url: 'https://saxx-blush.vercel.app/' },
+    { label: '10er-Übergang minus - Vorbereitung für "Schriftliche Subtraktion"', name: '10erm', url: 'https://10erm.vercel.app/' },
+    { label: 'Runden auf 10er', name: 'rund10', url: 'https://rund10.vercel.app/' },
+    { label: 'Runden auf 100er', name: 'rund100', url: 'https://rund100.vercel.app/' },
+    { label: 'Schriftliche Addition mit 3 Summanden - 100er und 10er', name: 'saxx3s', url: 'https://saxx3s.vercel.app/' },
+    { label: 'Schriftliche Addition mit 2 Summanden - 100er uns 10er', name: 'saxx23', url: 'https://saxx23.vercel.app/' },
+    { label: 'Schriftliche Addition mit 2 Summanden - 100er', name: 'saxx-blush', url: 'https://saxx-blush.vercel.app/' },
     { label: 'Vorlage', name: '', url: '' },
     { label: 'Vorlage', name: '', url: '' },
     { label: 'Vorlage', name: '', url: '' },
     { label: '2. Klasse' },
-    { label: 'Fünfte Seite', name: '10er-Übergang mit -', url: 'https://verliebte-zahlen.vercel.app/' },
+    { label: '', name: '', url: '' },
     { label: 'Sonstiges'},
-    { label: '6. Seite', name: 'Schriftliche Addition - 3 Summanden', url: 'https://verliebte-zahlen.vercel.app/' },
+    { label: '', name: '', url: '' },
 
 
     { label: 'Vorlage', name: '', url: '' },
