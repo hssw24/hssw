@@ -4,18 +4,22 @@ const App = () => {
   const links = [
     { label: '3. Klasse' },
     { label: '10er-Übergang minus - Vorbereitung für "Schriftliche Subtraktion"', name: '10er-Übergang minus', url: 'https://10erm.vercel.app/' },
-    { label: 'Dritte Seite', name: 'Zehner Plus', url: 'https://zehnerplus.vercel.app/' },
+    { label: 'Runden auf 10er', name: 'Runden auf 10er', url: 'https://rund10.vercel.app/' },
+    { label: 'Runden auf 100er', name: 'Runden auf 100er', url: 'https://rund100.vercel.app/' },
+    { label: 'Schriftliche Addition mit 3 Summanden', name: 'Schriftliche Addition mit 3 Summanden', url: 'https://saxx3s.vercel.app/' },
     { label: '2. Klasse' },
     { label: 'Vierte Seite', name: '10er-Übergang mit +', url: 'https://obst-one.vercel.app/' },
     { label: 'Fünfte Seite', name: '10er-Übergang mit -', url: 'https://verliebte-zahlen.vercel.app/' },
     { label: 'Sonstiges'},
     { label: '6. Seite', name: 'Schriftliche Addition - 3 Summanden', url: 'https://verliebte-zahlen.vercel.app/' },
-    { label: '7. Seite', name: 'Verliebte Zahlen', url: 'https://verliebte-zahlen.vercel.app/' },
+
+
+    { label: 'Vorlage', name: '', url: '' },
   ];
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 p-4">
-      <h1 className="text-4xl font-bold mb-8">Meine Seiten</h1>
+      <h3 className="text-4xl font-bold mb-8">Grundschule Afferde</h3>
       <div className="flex flex-col gap-4">
         {links.map((link, index) => (
           <React.Fragment key={index}>
