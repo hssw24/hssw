@@ -39,7 +39,7 @@ const App = () => {
                   rel="noopener noreferrer"
                   className="w-full bg-white p-4 rounded-lg shadow-md hover:bg-gray-50 transition text-center"
                 >
-                  <button className="text-lg font-semibold bg-green text-blue-500">{link.name}</button>
+                  <button className="text-lg font-semibold bg-green-500 text-blue-500">{link.name}</button>
                 </a>
               </div>
             )}
