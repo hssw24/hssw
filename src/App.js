@@ -37,9 +37,9 @@ const App = () => {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full bg-lightgreen p-4 rounded-lg shadow-md hover:bg-gray-50 transition text-center"
+                  className="w-full bg-white p-4 rounded-lg shadow-md hover:bg-gray-50 transition text-center"
                 >
-                  <button className="text-lg font-semibold text-blue-500">{link.name}</button>
+                  <button className="text-lg font-semibold bg-lightgreen text-blue-500">{link.name}</button>
                 </a>
               </div>
             )}
