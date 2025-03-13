@@ -4,12 +4,12 @@ const App = () => {
   const links = [
     { label: '3. Klasse' },
     { label: '10er-Übergang minus - Vorbereitung für "Schriftliche Subtraktion"', name: '10erm', url: 'https://10erm.vercel.app/' },
+    { label: 'Schriftliche Subtraktion mit Minuend und Subtrahend', name: 'ssub1s', url: 'https://ssub1s.vercel.app/' },
     { label: 'Runden auf 10er', name: 'rund10', url: 'https://rund10.vercel.app/' },
     { label: 'Runden auf 100er', name: 'rund100', url: 'https://rund100.vercel.app/' },
     { label: 'Schriftliche Addition mit 3 Summanden - 100er und 10er', name: 'saxx3s', url: 'https://saxx3s.vercel.app/' },
     { label: 'Schriftliche Addition mit 2 Summanden - 100er uns 10er', name: 'saxx23', url: 'https://saxx23.vercel.app/' },
     { label: 'Schriftliche Addition mit 2 Summanden - 100er', name: 'saxx-blush', url: 'https://saxx-blush.vercel.app/' },
-    { label: 'Schriftliche Subtraktion mit Minuend und Subtrahend', name: 'ssub1s', url: 'https://ssub1s.vercel.app/' },
     { label: 'Vorlage', name: '', url: '' },
     { label: 'Bei Fehlern bitte eine Nachricht über SDUI senden.', name: '', url: '' },
     { label: 'Vorlage', name: '', url: '' },
