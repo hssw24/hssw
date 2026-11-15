@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Link-Sammlung</title>
+
+<style>
+/* ==================== DESIGN (CSS) ====================
+   Farben stehen als Variablen oben, so kann man sie leicht ändern.
+   Im Dunkelmodus des Handys werden automatisch die dunklen Farben genommen. */
+:root {
+  --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --muted: #6b7280;
+  --accent: #2563eb; --border: #dfe3ea; --danger: #dc2626;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12151c; --card: #1c212b; --text: #e8ebf0; --muted: #9aa3b2;
+    --accent: #6ea0ff; --border: #2d3442; --danger: #f87171;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 12px; background: var(--bg); color: var(--text);
+       font-family: system-ui, sans-serif; font-size: 16px; }
+.wrap { max-width: 720px; margin: 0 auto; }
+h1 { font-size: 1.4rem; margin: 4px 0 12px; }
+
+input, select, textarea, button { font: inherit; color: inherit; }
+input, select, textarea { width: 100%; padding: 10px; margin: 4px 0 10px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px; }
+button { padding: 9px 14px; border: 1px solid var(--border); border-radius: 8px;
+         background: var(--card); cursor: pointer; }
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger  { color: var(--danger); }
+.row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.row > * { flex: 1; }
+.row > button { flex: 0 0 auto; }
+
+/* Themen-Schaltflächen */
+.chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0 12px; }
+.chip { padding: 5px 12px; border-radius: 999px; font-size: .9rem; }
+.chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+/* Eine Link-Karte */
+.card { background: var(--card); border: 1px solid var(--border);
+        border-radius: 10px; padding: 12px; margin-bottom: 10px; }
+.card a.title { font-weight: 600; color: var(--accent); text-decoration: none;
+                word-break: break-word; }
+.meta { color: var(--muted); font-size: .85rem; margin: 2px 0 6px; }
+.comment { white-space: pre-wrap; margin: 6px 0; }
+.actions { display: flex; gap: 6px; margin-top: 8px; }
+.actions button { padding: 5px 10px; font-size: .9rem; }
+
+#formBox { background: var(--card); border: 2px solid var(--accent);
+           border-radius: 10px; padding: 12px; margin-bottom: 14px; display: none; }
+label { font-size: .85rem; color: var(--muted); }
+.empty { text-align: center; color: var(--muted); padding: 30px 0; }
+</style>
+</head>
+
+<body>
+<div class="wrap">
+  <h1>🔗 Meine Link-Sammlung</h1>
+
+  <!-- ===== Formular zum Anlegen / Bearbeiten (anfangs versteckt) ===== -->
+  <div id="formBox">
+    <input type="hidden" id="fId">
+    <label for="fUrl">Link (URL)</label>
+    <input id="fUrl" type="text" inputmode="url" placeholder="https://...">
+    <label for="fTitle">Titel (leer lassen = Webseiten-Name)</label>
+    <input id="fTitle" type="text">
+    <label for="fTopic">Thema (aus der Liste wählen oder neues eintippen)</label>
+    <input id="fTopic" type="text" list="topicList">
+    <datalist id="topicList"></datalist>
+    <label for="fComment">Kommentar</label>
+    <textarea id="fComment" rows="3"></textarea>
+    <label><input type="checkbox" id="fFav" style="width:auto"> ⭐ Favorit</label>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="btnSave">Speichern</button>
+      <button id="btnCancel">Abbrechen</button>
+    </div>
+  </div>
+
+  <!-- ===== Bedienleiste: neu, Suche, Sortierung ===== -->
+  <div class="row">
+    <button class="primary" id="btnNew">＋ Neuer Link</button>
+    <button id="btnFav">☆ Favoriten</button>
+  </div>
+  <input id="search" type="search" placeholder="🔍 Suchen in Titel, Link, Kommentar, Thema ..." style="margin-top:10px">
+  <div class="row">
+    <select id="sort">
+      <option value="new">Neueste zuerst</option>
+      <option value="old">Älteste zuerst</option>
+      <option value="az">Titel A–Z</option>
+      <option value="topic">Nach Thema</option>
+    </select>
+  </div>
+  <div class="chips" id="chips"></div>
+  <div class="meta" id="count"></div>
+
+  <!-- Hier werden die Link-Karten eingefügt -->
+  <div id="list"></div>
+
+  <!-- ===== Sicherung ===== -->
+  <div class="card">
+    <strong>Sicherung</strong>
+    <div class="meta">Die Daten liegen nur in diesem Browser. Mach regelmäßig einen Export!</div>
+    <div class="row">
+      <button id="btnExport">⬇ Exportieren</button>
+      <button id="btnImport">⬆ Importieren</button>
+    </div>
+    <input type="file" id="fileInput" accept=".json,application/json" style="display:none">
+  </div>
+</div>
+
+<script>
+/* ==================== PROGRAMM (JavaScript) ====================
+   Ablauf: Daten laden -> filtern/sortieren -> anzeigen (render).
+   Bei jeder Änderung: speichern -> neu anzeigen. */
+
+// ---------- 1. Speicher ----------
+var STORAGE_KEY = "linkSammlung_v1";   // Name des Speicherfachs im Browser
+var links = [];                        // Liste aller Links (Array aus Objekten)
+var topicFilter = "";                  // gewähltes Thema ("" = alle)
+var onlyFav = false;                   // nur Favoriten anzeigen?
+var STANDARD_THEMEN = ["Schnäppchen", "PC-Tipps", "Haushaltstricks", "Handyeinstellungen"];
+
+function load() {
+  try {
+    var raw = localStorage.getItem(STORAGE_KEY);
+    links = raw ? JSON.parse(raw) : [];
+  } catch (e) { links = []; }
+}
+function save() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(links)); }
+  catch (e) { alert("Speichern nicht möglich (Browser blockiert Speicher?)."); }
+}
+
+// ---------- 2. Hilfsfunktionen ----------
+// Kurzform für document.getElementById
+function $(id) { return document.getElementById(id); }
+
+// Verhindert, dass Sonderzeichen im Text als HTML gelesen werden (Sicherheit!)
+function esc(text) {
+  var d = document.createElement("div");
+  d.textContent = text == null ? "" : text;
+  return d.innerHTML.replace(/"/g, "&quot;");
+}
+
+// Ergänzt https://, falls es fehlt
+function fixUrl(u) {
+  u = (u || "").trim();
+  if (u && !/^https?:\/\//i.test(u)) u = "https://" + u;
+  return u;
+}
+
+// Holt den Domain-Namen, z. B. "www.test.de"
+function domain(u) {
+  try { return new URL(u).hostname.replace(/^www\./, ""); } catch (e) { return u; }
+}
+
+// Alle vorhandenen Themen (Standard + selbst angelegte), alphabetisch
+function allTopics() {
+  var list = STANDARD_THEMEN.slice();
+  links.forEach(function (l) {
+    if (l.topic && list.indexOf(l.topic) === -1) list.push(l.topic);
+  });
+  return list.sort(function (a, b) { return a.localeCompare(b, "de"); });
+}
+
+// ---------- 3. Filtern + Sortieren ----------
+function getVisible() {
+  var words = $("search").value.toLowerCase().split(" ").filter(Boolean);
+
+  var result = links.filter(function (l) {
+    if (topicFilter && l.topic !== topicFilter) return false;
+    if (onlyFav && !l.fav) return false;
+    // Alle Suchwörter müssen irgendwo vorkommen
+    var text = (l.title + " " + l.url + " " + l.comment + " " + l.topic).toLowerCase();
+    return words.every(function (w) { return text.indexOf(w) !== -1; });
+  });
+
+  var mode = $("sort").value;
+  result.sort(function (a, b) {
+    if (mode === "old")   return a.created - b.created;
+    if (mode === "az")    return a.title.localeCompare(b.title, "de");
+    if (mode === "topic") return (a.topic || "").localeCompare(b.topic || "", "de")
+                                 || a.title.localeCompare(b.title, "de");
+    return b.created - a.created;   // "new" = neueste zuerst
+  });
+  return result;
+}
+
+// ---------- 4. Anzeigen ----------
+function render() {
+  // Themen-Schaltflächen mit Anzahl bauen
+  var html = '<button class="chip' + (topicFilter === "" ? " active" : "") +
+             '" data-topic="">Alle (' + links.length + ')</button>';
+  allTopics().forEach(function (t) {
+    var n = links.filter(function (l) { return l.topic === t; }).length;
+    html += '<button class="chip' + (topicFilter === t ? " active" : "") +
+            '" data-topic="' + esc(t) + '">' + esc(t) + " (" + n + ")</button>";
+  });
+  $("chips").innerHTML = html;
+
+  // Vorschlagsliste im Formular
+  $("topicList").innerHTML = allTopics().map(function (t) {
+    return '<option value="' + esc(t) + '">';
+  }).join("");
+
+  $("btnFav").textContent = onlyFav ? "★ Favoriten" : "☆ Favoriten";
+  $("btnFav").classList.toggle("primary", onlyFav);
+
+  // Karten bauen
+  var visible = getVisible();
+  $("count").textContent = visible.length + " von " + links.length + " Links";
+
+  if (visible.length === 0) {
+    $("list").innerHTML = '<div class="empty">Keine Links gefunden.</div>';
+    return;
+  }
+  $("list").innerHTML = visible.map(function (l) {
+    return '<div class="card">' +
+      '<a class="title" href="' + esc(l.url) + '" target="_blank" rel="noopener">' +
+        (l.fav ? "⭐ " : "") + esc(l.title) + '</a>' +
+      '<div class="meta">' + esc(domain(l.url)) +
+        (l.topic ? " · " + esc(l.topic) : "") +
+        " · " + new Date(l.created).toLocaleDateString("de-DE") + '</div>' +
+      (l.comment ? '<div class="comment">' + esc(l.comment) + '</div>' : "") +
+      '<div class="actions" data-id="' + l.id + '">' +
+        '<button data-act="fav">' + (l.fav ? "★" : "☆") + '</button>' +
+        '<button data-act="edit">✏️ Bearbeiten</button>' +
+        '<button data-act="copy">📋 Kopieren</button>' +
+        '<button data-act="del" class="danger">🗑</button>' +
+      '</div></div>';
+  }).join("");
+}
+
+// ---------- 5. Formular ----------
+// openForm(null)  = neuer Link, openForm(link) = bestehenden bearbeiten
+function openForm(link, preset) {
+  var data = link || preset || {};
+  $("fId").value      = link ? link.id : "";
+  $("fUrl").value     = data.url || "";
+  $("fTitle").value   = data.title || "";
+  $("fTopic").value   = data.topic || topicFilter;
+  $("fComment").value = data.comment || "";
+  $("fFav").checked   = !!data.fav;
+  $("formBox").style.display = "block";
+  $("formBox").scrollIntoView({ behavior: "smooth" });
+}
+function closeForm() { $("formBox").style.display = "none"; }
+
+function saveForm() {
+  var url = fixUrl($("fUrl").value);
+  if (!url) { alert("Bitte einen Link eingeben."); return; }
+
+  var id = $("fId").value;
+  // Doppelte Links erkennen (nur bei neuen Einträgen)
+  if (!id && links.some(function (l) { return l.url === url; })) {
+    if (!confirm("Diesen Link gibt es schon. Trotzdem speichern?")) return;
+  }
+  var entry = {
+    id: id || String(Date.now()),
+    url: url,
+    title: $("fTitle").value.trim() || domain(url),
+    topic: $("fTopic").value.trim(),
+    comment: $("fComment").value.trim(),
+    fav: $("fFav").checked,
+    created: Date.now()
+  };
+  if (id) {
+    // Bearbeiten: alten Eintrag ersetzen, Erstelldatum behalten
+    links = links.map(function (l) {
+      if (l.id !== id) return l;
+      entry.created = l.created;
+      return entry;
+    });
+  } else {
+    links.push(entry);
+  }
+  save(); closeForm(); render();
+}
+
+// ---------- 6. Klicks auf Karten (Favorit, Bearbeiten, Kopieren, Löschen) ----------
+$("list").addEventListener("click", function (e) {
+  var btn = e.target.closest("button[data-act]");
+  if (!btn) return;
+  var id = btn.parentNode.getAttribute("data-id");
+  var link = links.filter(function (l) { return l.id === id; })[0];
+  var act = btn.getAttribute("data-act");
+
+  if (act === "fav")  { link.fav = !link.fav; save(); render(); }
+  if (act === "edit") { openForm(link); }
+  if (act === "copy") {
+    navigator.clipboard.writeText(link.url).then(function () { btn.textContent = "✓ Kopiert"; });
+  }
+  if (act === "del" && confirm("„" + link.title + "“ wirklich löschen?")) {
+    links = links.filter(function (l) { return l.id !== id; });
+    save(); render();
+  }
+});
+
+// Klick auf ein Thema
+$("chips").addEventListener("click", function (e) {
+  var chip = e.target.closest(".chip");
+  if (!chip) return;
+  topicFilter = chip.getAttribute("data-topic");
+  render();
+});
+
+// ---------- 7. Export / Import ----------
+function exportData() {
+  var blob = new Blob([JSON.stringify(links, null, 2)], { type: "application/json" });
+  var a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "link-sammlung-" + new Date().toISOString().slice(0, 10) + ".json";
+  a.click();
+}
+function importData(file) {
+  var reader = new FileReader();
+  reader.onload = function () {
+    try {
+      var imported = JSON.parse(reader.result);
+      var added = 0;
+      imported.forEach(function (n) {
+        // Nur übernehmen, was noch nicht vorhanden ist (gleiche URL)
+        if (n.url && !links.some(function (l) { return l.url === n.url; })) {
+          n.id = n.id || String(Date.now() + added);
+          n.created = n.created || Date.now();
+          n.title = n.title || domain(n.url);
+          n.comment = n.comment || "";
+          n.topic = n.topic || "";
+          links.push(n); added++;
+        }
+      });
+      save(); render();
+      alert(added + " neue Links importiert.");
+    } catch (e) { alert("Diese Datei kann nicht gelesen werden."); }
+  };
+  reader.readAsText(file);
+}
+
+// ---------- 8. Link über „Teilen“ empfangen ----------
+// Kommt die Seite mit ?url=...&title=...&text=... an (Teilen-Funktion),
+// öffnen wir das Formular direkt mit diesen Angaben.
+function checkShare() {
+  var p = new URLSearchParams(location.search);
+  var url = p.get("url") || "";
+  var text = p.get("text") || "";
+  // Android schickt den Link oft im Feld „text“
+  if (!url) { var m = text.match(/https?:\/\/\S+/); if (m) url = m[0]; }
+  if (url) {
+    openForm(null, { url: url, title: p.get("title") || "" });
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  }
+}
+
+// ---------- 9. Knöpfe verbinden und starten ----------
+$("btnNew").onclick    = function () { openForm(null); };
+$("btnSave").onclick   = saveForm;
+$("btnCancel").onclick = closeForm;
+$("btnFav").onclick    = function () { onlyFav = !onlyFav; render(); };
+$("search").oninput    = render;
+$("sort").onchange     = render;
+$("btnExport").onclick = exportData;
+$("btnImport").onclick = function () { $("fileInput").click(); };
+$("fileInput").onchange = function () {
+  if (this.files[0]) importData(this.files[0]);
+  this.value = "";
+};
+
+load();
+render();
+checkShare();
+</script>
+</body>
+</html>
