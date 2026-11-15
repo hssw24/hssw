@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<!-- Wichtig fürs Handy: Seite so breit wie der Bildschirm darstellen -->
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Haushaltsbuch</title>
+
+<!-- SheetJS: Bibliothek zum Lesen/Schreiben von Excel-Dateien (braucht beim Laden Internet).
+     Für den Offline-Betrieb: Datei herunterladen, neben diese HTML-Datei legen
+     und die Zeile durch <script src="xlsx.full.min.js"></script> ersetzen. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+  /* ---------- Farben als Variablen (einmal ändern, überall wirksam) ---------- */
+  :root {
+    --bg: #f4f5f7; --karte: #ffffff; --text: #1d2530; --grau: #6b7684;
+    --akzent: #2563eb; --plus: #15803d; --minus: #b91c1c; --linie: #e1e5ea;
+  }
+  /* Dunkelmodus: wird automatisch aktiv, wenn das Handy ihn nutzt */
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14171c; --karte: #1f242b; --text: #e8ebef; --grau: #9aa5b1;
+            --akzent: #60a5fa; --plus: #4ade80; --minus: #f87171; --linie: #313843; }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: system-ui, sans-serif; font-size: 16px;
+    padding: env(safe-area-inset-top) 0 90px; /* unten Platz für die Menüleiste */
+  }
+  main { max-width: 600px; margin: 0 auto; padding: 12px; }
+  h1, h2 { margin: 8px 0; font-size: 1.2rem; }
+
+  .karte { background: var(--karte); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+  .faellig { border-left: 5px solid var(--akzent); }
+
+  /* Eingabefelder: mind. 16px Schrift, sonst zoomt das iPhone beim Antippen */
+  label { display: block; margin: 10px 0 4px; color: var(--grau); font-size: .9rem; }
+  input, select {
+    width: 100%; padding: 12px; font-size: 16px; color: var(--text);
+    background: var(--bg); border: 1px solid var(--linie); border-radius: 8px;
+  }
+  button {
+    padding: 12px 16px; font-size: 16px; border: 0; border-radius: 8px;
+    background: var(--akzent); color: #fff; cursor: pointer;
+  }
+  button.grau { background: var(--linie); color: var(--text); }
+  button.rot { background: var(--minus); }
+  .zeile { display: flex; gap: 8px; margin-top: 12px; }
+  .zeile button { flex: 1; }
+
+  /* Monatsnavigation und Saldo-Übersicht */
+  .monatsnavi { display: flex; align-items: center; justify-content: space-between; }
+  .monatsnavi h1 { text-transform: capitalize; }
+  #saldoKarte { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  #saldoKarte small { display: block; color: var(--grau); }
+
+  /* Buchungsliste */
+  ul { list-style: none; margin: 0; padding: 0; }
+  li { display: flex; gap: 10px; align-items: center; padding: 12px;
+       background: var(--karte); border-bottom: 1px solid var(--linie); }
+  li:first-child { border-radius: 12px 12px 0 0; }
+  li:last-child { border-radius: 0 0 12px 12px; border-bottom: 0; }
+  li .d { color: var(--grau); width: 3.2em; flex: none; }
+  li .t { flex: 1; overflow-wrap: anywhere; }
+  .plus { color: var(--plus); } .minus { color: var(--minus); }
+  .leer { color: var(--grau); text-align: center; padding: 20px; }
+
+  /* Untere Menüleiste */
+  nav {
+    position: fixed; left: 0; right: 0; bottom: 0; display: flex;
+    background: var(--karte); border-top: 1px solid var(--linie);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  nav button { flex: 1; background: none; color: var(--grau); border-radius: 0; padding: 14px 4px; font-size: .85rem; }
+  nav button.aktiv { color: var(--akzent); font-weight: 600; }
+</style>
+</head>
+
+<body>
+<main>
+
+  <!-- ============ ANSICHT 1: Monatsliste ============ -->
+  <section id="ansicht-monat">
+    <div class="monatsnavi">
+      <button class="grau" onclick="monatWechseln(-1)">‹</button>
+      <h1 id="monatTitel"></h1>
+      <button class="grau" onclick="monatWechseln(1)">›</button>
+    </div>
+    <div id="faellig"></div>      <!-- hier erscheinen fällige Dauerbuchungen -->
+    <div class="karte" id="saldoKarte"></div>
+    <ul id="liste"></ul>
+  </section>
+
+  <!-- ============ ANSICHT 2: Neue Buchung ============ -->
+  <section id="ansicht-neu" hidden>
+    <div class="karte">
+      <h2 id="formTitel">Neue Buchung</h2>
+      <input type="hidden" id="bId"> <!-- gefüllt, wenn eine bestehende Buchung bearbeitet wird -->
+      <label for="bDatum">Datum</label>
+      <input type="date" id="bDatum">
+      <label for="bArt">Art</label>
+      <select id="bArt"><option value="aus">Ausgabe</option><option value="ein">Einnahme</option></select>
+      <label for="bBetrag">Betrag in €</label>
+      <!-- inputmode="decimal" zeigt auf dem Handy die Zifferntastatur -->
+      <input type="text" inputmode="decimal" id="bBetrag" placeholder="z. B. 12,50">
+      <label for="bText">Text</label>
+      <!-- list="vorschlaege" verbindet das Feld mit der Vorschlagsliste (siehe <datalist> unten) -->
+      <input type="text" id="bText" list="vorschlaege" autocomplete="off" placeholder="z. B. Supermarkt">
+      <div class="zeile">
+        <button onclick="speichereBuchung()">Speichern</button>
+        <button class="rot" id="loeschenKnopf" onclick="loescheBuchung()" hidden>Löschen</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ ANSICHT 3: Regelmäßige Buchungen ============ -->
+  <section id="ansicht-regeln" hidden>
+    <div class="karte">
+      <h2>Neue regelmäßige Buchung</h2>
+      <label for="rText">Text</label>
+      <input type="text" id="rText" list="vorschlaege" autocomplete="off">
+      <label for="rArt">Art</label>
+      <select id="rArt"><option value="aus">Ausgabe</option><option value="ein">Einnahme</option></select>
+      <label for="rBetrag">Betrag in €</label>
+      <input type="text" inputmode="decimal" id="rBetrag">
+      <label for="rIntervall">Wiederholung</label>
+      <select id="rIntervall"></select>
+      <label for="rDatum">Nächster Termin</label>
+      <input type="date" id="rDatum">
+      <div class="zeile"><button onclick="speichereRegel()">Hinzufügen</button></div>
+    </div>
+    <h2>Gespeicherte regelmäßige Buchungen</h2>
+    <ul id="regelListe"></ul>
+  </section>
+
+  <!-- ============ ANSICHT 4: Daten / Excel ============ -->
+  <section id="ansicht-daten" hidden>
+    <div class="karte">
+      <h2>Anfangskontostand</h2>
+      <label for="start">Kontostand vor der ersten Buchung (€)</label>
+      <input type="text" inputmode="decimal" id="start">
+      <div class="zeile"><button onclick="speichereStart()">Übernehmen</button></div>
+    </div>
+    <div class="karte">
+      <h2>Excel</h2>
+      <p>Die Daten liegen im Browser dieses Geräts. Eine Webseite darf keine Datei
+         „von selbst“ speichern – sichere deshalb regelmäßig per Excel-Export.</p>
+      <div class="zeile">
+        <button onclick="exportExcel()">Als Excel speichern</button>
+        <button class="grau" onclick="document.getElementById('importDatei').click()">Excel laden</button>
+      </div>
+      <!-- verstecktes Dateifeld, wird über den Knopf oben geöffnet -->
+      <input type="file" id="importDatei" accept=".xlsx" hidden onchange="importExcel(event)">
+    </div>
+  </section>
+
+</main>
+
+<!-- Untere Menüleiste -->
+<nav>
+  <button data-a="monat"  onclick="navi('monat')">Monat</button>
+  <button data-a="neu"    onclick="navi('neu')">＋ Neu</button>
+  <button data-a="regeln" onclick="navi('regeln')">Regelmäßig</button>
+  <button data-a="daten"  onclick="navi('daten')">Daten</button>
+</nav>
+
+<!-- Vorschlagsliste für das Textfeld; wird per JavaScript befüllt -->
+<datalist id="vorschlaege"></datalist>
+
+<script>
+/* =====================================================================
+   1. GRUNDLAGEN
+   ===================================================================== */
+
+// Mögliche Wiederholungen. "tage" = alle X Tage, "monate" = alle X Monate.
+const INTERVALLE = {
+  'wöchentlich':     { tage: 7 },
+  'alle 2 Wochen':   { tage: 14 },
+  'monatlich':       { monate: 1 },
+  'vierteljährlich': { monate: 3 },
+  'halbjährlich':    { monate: 6 },
+  'jährlich':        { monate: 12 }
+};
+
+const SPEICHER_NAME = 'haushaltsbuch-v1';  // Name, unter dem der Browser die Daten ablegt
+
+// Kurzschreibweise: $('abc') statt document.getElementById('abc')
+const $ = id => document.getElementById(id);
+
+// Daten laden: Der Browser speichert Text, daher JSON.parse (Text → Objekt)
+function laden() {
+  try {
+    const text = localStorage.getItem(SPEICHER_NAME);
+    if (text) return JSON.parse(text);
+  } catch (e) { /* kein Speicher verfügbar: wir starten leer */ }
+  return { start: 0, buchungen: [], regeln: [] };
+}
+let daten = laden();
+
+// Daten speichern: JSON.stringify (Objekt → Text)
+function speichern() {
+  try { localStorage.setItem(SPEICHER_NAME, JSON.stringify(daten)); }
+  catch (e) { alert('Speichern im Browser nicht möglich.'); }
+}
+
+// Hilfsfunktionen -------------------------------------------------------
+// Datum als Text "JJJJ-MM-TT" (so speichern wir alle Datumsangaben)
+const iso = d => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+// Text "JJJJ-MM-TT" zurück in ein Datum
+const alsDate = s => { const [j, m, t] = s.split('-').map(Number); return new Date(j, m - 1, t); };
+const euro = n => n.toLocaleString('de-DE', { style: 'currency', currency: 'EUR' });
+const datumKurz = s => s.slice(8) + '.' + s.slice(5, 7) + '.';
+const datumLang = s => datumKurz(s) + s.slice(0, 4);
+const neueId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+// Verhindert, dass Eingaben wie "<b>" als HTML-Code gedeutet werden
+const esc = t => String(t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+// Zahl aus Eingabe lesen: akzeptiert "12,50" und "1.234,50" und "12.5"
+function zahl(v) {
+  v = String(v).trim();
+  if (v.includes(',')) v = v.replace(/\./g, '').replace(',', '.');
+  return parseFloat(v);
+}
+
+/* =====================================================================
+   2. ANSICHTEN UMSCHALTEN
+   ===================================================================== */
+function ansicht(name) {
+  // Alle Bereiche verstecken, nur den gewünschten zeigen
+  document.querySelectorAll('main section').forEach(s => s.hidden = (s.id !== 'ansicht-' + name));
+  document.querySelectorAll('nav button').forEach(b => b.classList.toggle('aktiv', b.dataset.a === name));
+  if (name === 'monat') zeigeMonat();
+  if (name === 'regeln') zeigeRegeln();
+  if (name === 'daten') $('start').value = String(daten.start).replace('.', ',');
+  window.scrollTo(0, 0);
+}
+function navi(name) { if (name === 'neu') formLeeren(); ansicht(name); }
+
+/* =====================================================================
+   3. MONATSLISTE
+   ===================================================================== */
+let monat = iso(new Date()).slice(0, 7);   // angezeigter Monat, z. B. "2026-11"
+
+function monatWechseln(schritt) {
+  const [j, m] = monat.split('-').map(Number);
+  monat = iso(new Date(j, m - 1 + schritt, 1)).slice(0, 7);
+  zeigeMonat();
+}
+
+function zeigeMonat() {
+  const [j, m] = monat.split('-').map(Number);
+  $('monatTitel').textContent = new Date(j, m - 1, 1).toLocaleDateString('de-DE', { month: 'long', year: 'numeric' });
+
+  // Kontostand am Monatsanfang = Anfangskontostand + alle früheren Buchungen
+  const anfang = daten.buchungen
+    .filter(b => b.datum < monat + '-01')
+    .reduce((summe, b) => summe + b.betrag, daten.start);
+
+  // Buchungen dieses Monats, nach Datum sortiert
+  const liste = daten.buchungen
+    .filter(b => b.datum.startsWith(monat))
+    .sort((a, b) => a.datum.localeCompare(b.datum));
+
+  let ein = 0, aus = 0;
+  liste.forEach(b => { if (b.betrag >= 0) ein += b.betrag; else aus += b.betrag; });
+
+  $('saldoKarte').innerHTML =
+    `<div><small>Anfang</small><b>${euro(anfang)}</b></div>
+     <div><small>Ende</small><b>${euro(anfang + ein + aus)}</b></div>
+     <div><small>Einnahmen</small><b class="plus">${euro(ein)}</b></div>
+     <div><small>Ausgaben</small><b class="minus">${euro(aus)}</b></div>`;
+
+  $('liste').innerHTML = liste.length
+    ? liste.map(b => `<li onclick="bearbeiten('${b.id}')">
+        <span class="d">${datumKurz(b.datum)}</span>
+        <span class="t">${esc(b.text)}</span>
+        <b class="${b.betrag < 0 ? 'minus' : 'plus'}">${euro(b.betrag)}</b></li>`).join('')
+    : '<div class="leer karte">Keine Buchungen in diesem Monat</div>';
+
+  zeigeFaellig();
+}
+
+/* =====================================================================
+   4. BUCHUNGEN ERFASSEN / BEARBEITEN
+   ===================================================================== */
+function formLeeren() {
+  $('formTitel').textContent = 'Neue Buchung';
+  $('bId').value = ''; $('bDatum').value = iso(new Date());
+  $('bArt').value = 'aus'; $('bBetrag').value = ''; $('bText').value = '';
+  $('loeschenKnopf').hidden = true;
+}
+
+function bearbeiten(id) {                       // wird beim Antippen einer Zeile aufgerufen
+  const b = daten.buchungen.find(x => x.id === id);
+  $('formTitel').textContent = 'Buchung bearbeiten';
+  $('bId').value = b.id; $('bDatum').value = b.datum;
+  $('bArt').value = b.betrag < 0 ? 'aus' : 'ein';
+  $('bBetrag').value = String(Math.abs(b.betrag)).replace('.', ',');
+  $('bText').value = b.text;
+  $('loeschenKnopf').hidden = false;
+  ansicht('neu');
+}
+
+function speichereBuchung() {
+  const datum = $('bDatum').value, text = $('bText').value.trim();
+  let betrag = zahl($('bBetrag').value);
+  if (!datum || !text || isNaN(betrag) || betrag === 0) {
+    alert('Bitte Datum, Betrag und Text ausfüllen.'); return;
+  }
+  // Ausgaben werden intern als negative Zahl gespeichert
+  betrag = Math.round(Math.abs(betrag) * 100) / 100 * ($('bArt').value === 'aus' ? -1 : 1);
+
+  const id = $('bId').value;
+  if (id) Object.assign(daten.buchungen.find(x => x.id === id), { datum, betrag, text });  // ändern
+  else daten.buchungen.push({ id: neueId(), datum, betrag, text });                          // neu
+  speichern();
+  monat = datum.slice(0, 7);          // gleich den Monat der Buchung anzeigen
+  vorschlaegeAktualisieren();
+  ansicht('monat');
+}
+
+function loescheBuchung() {
+  if (!confirm('Diese Buchung löschen?')) return;
+  daten.buchungen = daten.buchungen.filter(x => x.id !== $('bId').value);
+  speichern(); vorschlaegeAktualisieren(); ansicht('monat');
+}
+
+/* =====================================================================
+   5. TEXT-VORSCHLÄGE
+   ===================================================================== */
+// Füllt die <datalist> mit allen bisher verwendeten Texten (jeder nur einmal)
+function vorschlaegeAktualisieren() {
+  const texte = [...new Set(
+    [...daten.buchungen].reverse().map(b => b.text).concat(daten.regeln.map(r => r.text))
+  )];
+  $('vorschlaege').innerHTML = texte.map(t => `<option value="${esc(t)}">`).join('');
+}
+
+// Bonus: Wird ein bekannter Text gewählt, übernehmen wir Art und Betrag der letzten Buchung
+$('bText').addEventListener('change', () => {
+  if ($('bBetrag').value || $('bId').value) return;    // nichts überschreiben
+  const letzte = [...daten.buchungen].reverse().find(b => b.text === $('bText').value.trim());
+  if (letzte) {
+    $('bBetrag').value = String(Math.abs(letzte.betrag)).replace('.', ',');
+    $('bArt').value = letzte.betrag < 0 ? 'aus' : 'ein';
+  }
+});
+
+/* =====================================================================
+   6. REGELMÄSSIGE BUCHUNGEN
+   ===================================================================== */
+// Berechnet den Folgetermin einer Regel und trägt ihn in r.naechste ein
+function weiter(r) {
+  const d = alsDate(r.naechste), iv = INTERVALLE[r.intervall];
+  if (iv.tage) {
+    d.setDate(d.getDate() + iv.tage);
+  } else {
+    // Monatsweise: Tag bleibt gleich; im kurzen Monat (z. B. Februar) gilt der letzte Tag
+    const ziel = new Date(d.getFullYear(), d.getMonth() + iv.monate, 1);
+    const letzterTag = new Date(ziel.getFullYear(), ziel.getMonth() + 1, 0).getDate();
+    ziel.setDate(Math.min(r.tag, letzterTag));
+    r.naechste = iso(ziel); return;
+  }
+  r.naechste = iso(d);
+}
+
+// Fällige Regeln (Termin heute oder früher) oben in der Monatsansicht anbieten
+function zeigeFaellig() {
+  const heute = iso(new Date());
+  $('faellig').innerHTML = daten.regeln.filter(r => r.naechste <= heute).map(r =>
+    `<div class="karte faellig"><b>Fällig: ${esc(r.text)}</b><br>
+       ${datumLang(r.naechste)} · ${euro(r.betrag)}
+       <div class="zeile">
+         <button onclick="uebernehmen('${r.id}')">Übernehmen</button>
+         <button class="grau" onclick="ueberspringen('${r.id}')">Überspringen</button>
+       </div></div>`).join('');
+}
+
+function uebernehmen(id) {
+  const r = daten.regeln.find(x => x.id === id);
+  daten.buchungen.push({ id: neueId(), datum: r.naechste, betrag: r.betrag, text: r.text });
+  weiter(r); speichern(); zeigeMonat();
+}
+function ueberspringen(id) {
+  weiter(daten.regeln.find(x => x.id === id)); speichern(); zeigeMonat();
+}
+
+function speichereRegel() {
+  const text = $('rText').value.trim(), datum = $('rDatum').value;
+  let betrag = zahl($('rBetrag').value);
+  if (!text || !datum || isNaN(betrag) || betrag === 0) {
+    alert('Bitte Text, Betrag und Termin ausfüllen.'); return;
+  }
+  betrag = Math.round(Math.abs(betrag) * 100) / 100 * ($('rArt').value === 'aus' ? -1 : 1);
+  daten.regeln.push({
+    id: neueId(), text, betrag, intervall: $('rIntervall').value,
+    tag: Number(datum.slice(8)),     // Tag im Monat merken (für monatliche Wiederholung)
+    naechste: datum
+  });
+  speichern(); vorschlaegeAktualisieren();
+  $('rText').value = ''; $('rBetrag').value = '';
+  zeigeRegeln();
+}
+
+function zeigeRegeln() {
+  $('regelListe').innerHTML = daten.regeln.length
+    ? daten.regeln.map(r => `<li onclick="loescheRegel('${r.id}')">
+        <span class="t">${esc(r.text)}<br><small style="color:var(--grau)">${r.intervall}, nächster Termin ${datumLang(r.naechste)}</small></span>
+        <b class="${r.betrag < 0 ? 'minus' : 'plus'}">${euro(r.betrag)}</b></li>`).join('')
+    : '<div class="leer karte">Noch keine regelmäßigen Buchungen</div>';
+}
+function loescheRegel(id) {
+  if (!confirm('Diese regelmäßige Buchung löschen?\n(Bereits übernommene Buchungen bleiben erhalten.)')) return;
+  daten.regeln = daten.regeln.filter(r => r.id !== id);
+  speichern(); zeigeRegeln();
+}
+
+/* =====================================================================
+   7. ANFANGSKONTOSTAND
+   ===================================================================== */
+function speichereStart() {
+  const z = zahl($('start').value);
+  if (isNaN(z)) { alert('Bitte eine Zahl eingeben.'); return; }
+  daten.start = z; speichern(); alert('Gespeichert.');
+}
+
+/* =====================================================================
+   8. EXCEL-EXPORT UND -IMPORT
+   ===================================================================== */
+function exportExcel() {
+  if (typeof XLSX === 'undefined') { alert('Excel-Bibliothek nicht geladen (Internet nötig).'); return; }
+  const wb = XLSX.utils.book_new();   // neue Arbeitsmappe mit drei Tabellenblättern
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    daten.buchungen.map(b => ({ Datum: b.datum, Betrag: b.betrag, Text: b.text }))), 'Buchungen');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(
+    daten.regeln.map(r => ({ Text: r.text, Betrag: r.betrag, Intervall: r.intervall, Naechster_Termin: r.naechste }))), 'Regelmaessig');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([{ Anfangssaldo: daten.start }]), 'Einstellungen');
+  XLSX.writeFile(wb, 'haushaltsbuch.xlsx');    // löst den Download aus
+}
+
+// Datum aus Excel in "JJJJ-MM-TT" umwandeln (Text, TT.MM.JJJJ oder echtes Excel-Datum)
+function alsDatumText(v) {
+  if (v instanceof Date) return iso(new Date(v.getTime() + 12 * 3600 * 1000));
+  v = String(v || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;
+  const m = v.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  return m ? `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}` : '';
+}
+
+function importExcel(ev) {
+  const datei = ev.target.files[0];
+  if (!datei) return;
+  if (typeof XLSX === 'undefined') { alert('Excel-Bibliothek nicht geladen (Internet nötig).'); return; }
+  if (!confirm('Alle aktuellen Daten werden durch die Excel-Datei ersetzt. Fortfahren?')) { ev.target.value = ''; return; }
+
+  const leser = new FileReader();
+  leser.onload = () => {
+    try {
+      const wb = XLSX.read(leser.result, { type: 'array', cellDates: true });
+      const lies = name => wb.Sheets[name] ? XLSX.utils.sheet_to_json(wb.Sheets[name]) : [];
+      const neu = { start: 0, buchungen: [], regeln: [] };
+
+      lies('Buchungen').forEach(z => {
+        const datum = alsDatumText(z.Datum), betrag = zahl(z.Betrag);
+        if (datum && !isNaN(betrag)) neu.buchungen.push({ id: neueId(), datum, betrag, text: String(z.Text || '') });
+      });
+      lies('Regelmaessig').forEach(z => {
+        const naechste = alsDatumText(z.Naechster_Termin), betrag = zahl(z.Betrag);
+        if (naechste && !isNaN(betrag) && INTERVALLE[z.Intervall])
+          neu.regeln.push({ id: neueId(), text: String(z.Text || ''), betrag, intervall: z.Intervall,
+                            tag: Number(naechste.slice(8)), naechste });
+      });
+      const e = lies('Einstellungen')[0];
+      if (e && !isNaN(zahl(e.Anfangssaldo))) neu.start = zahl(e.Anfangssaldo);
+
+      daten = neu; speichern(); vorschlaegeAktualisieren();
+      alert(`Geladen: ${neu.buchungen.length} Buchungen, ${neu.regeln.length} regelmäßige Buchungen.`);
+      ansicht('monat');
+    } catch (fehler) { alert('Die Datei konnte nicht gelesen werden.'); }
+    ev.target.value = '';
+  };
+  leser.readAsArrayBuffer(datei);
+}
+
+/* =====================================================================
+   9. START
+   ===================================================================== */
+// Auswahlliste der Wiederholungen füllen
+$('rIntervall').innerHTML = Object.keys(INTERVALLE).map(k => `<option>${k}</option>`).join('');
+$('rIntervall').value = 'monatlich';
+$('rDatum').value = iso(new Date());
+vorschlaegeAktualisieren();
+formLeeren();
+ansicht('monat');
+</script>
+</body>
+</html>

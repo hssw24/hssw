@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WhatsApp-Nachrichten zählen</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#202124;background:#f4f6f8}
+body{margin:0;padding:18px}
+main{max-width:760px;margin:auto;background:white;padding:20px;border-radius:14px;box-shadow:0 2px 12px #00000012}
+h1{font-size:1.45rem;margin-top:0}
+p{line-height:1.45}
+label{display:block;font-weight:700;margin:16px 0 6px}
+input[type=text],input[type=file]{box-sizing:border-box;width:100%;padding:11px;border:1px solid #b9c0c8;border-radius:8px;background:white}
+button{border:0;border-radius:8px;padding:12px 16px;margin:14px 8px 8px 0;background:#176b50;color:white;font-weight:700;font-size:1rem}
+button.secondary{background:#52616b}
+.note{background:#eef5f1;padding:12px;border-radius:8px;font-size:.94rem}
+.error{color:#a32222}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:.95rem}
+th,td{padding:10px 7px;border-bottom:1px solid #e2e5e8;text-align:right}
+th:first-child,td:first-child{text-align:left;overflow-wrap:anywhere}
+th{background:#f1f3f4}
+.total{font-weight:700}
+.small{font-size:.88rem;color:#5f6368}
+#status{margin-top:12px}
+@media(max-width:480px){body{padding:8px}main{padding:14px}table{font-size:.85rem}th,td{padding:8px 4px}}
+</style>
+</head>
+<body>
+<main>
+<h1>WhatsApp-Nachrichten zählen</h1>
+<p>Mit diesem kleinen Werkzeug kannst du exportierte WhatsApp-Chats auswerten. Die Dateien werden nur in deinem Browser verarbeitet und nicht hochgeladen.</p>
+
+<label for="ownName">Dein Name, wie er im WhatsApp-Chat erscheint</label>
+<input id="ownName" type="text" placeholder="z. B. Hans">
+
+<label for="files">WhatsApp-Chatdateien auswählen (.txt)</label>
+<input id="files" type="file" accept=".txt,text/plain" multiple>
+
+<p class="note"><strong>So geht's:</strong> In WhatsApp den Chat öffnen → ⋮ → Mehr → Chat exportieren → Ohne Medien. Anschließend die gespeicherte TXT-Datei hier auswählen. Du kannst mehrere Chatdateien gleichzeitig auswählen.</p>
+
+<button id="countBtn">Nachrichten zählen</button>
+<button id="csvBtn" class="secondary" disabled>Ergebnis als CSV speichern</button>
+<div id="status" aria-live="polite"></div>
+<div id="results"></div>
+<p class="small">Gezählt werden normale Chatnachrichten. Systemmeldungen ohne erkennbaren Absender werden ignoriert. Bei Gruppenchats werden Nachrichten aller anderen Teilnehmer zusammen als „Empfangen“ gezählt.</p>
+</main>
+<script>
+let latestRows=[];
+const $=id=>document.getElementById(id);
+
+function parseChat(text){
+  const lines=text.replace(/^\uFEFF/,'').split(/\r?\n/);
+  const messages=[];
+  // Supports common Android/iPhone exports:
+  // 14.11.26, 12:34 - Name: message
+  // [14.11.26, 12:34:56] Name: message
+  const start=/^(?:\[)?\d{1,2}[./-]\d{1,2}[./-]\d{2,4},?\s+\d{1,2}:\d{2}(?::\d{2})?(?:\])?\s+-\s+/;
+  const bracketStart=/^\[\d{1,2}[./-]\d{1,2}[./-]\d{2,4},\s+\d{1,2}:\d{2}(?::\d{2})?\]\s+/;
+  let current=null;
+  for(const line of lines){
+    let match=line.match(start);
+    let bracket=line.match(bracketStart);
+    if(match || bracket){
+      if(current) messages.push(current);
+      let rest=line.slice((match||bracket)[0].length);
+      const colon=rest.indexOf(': ');
+      if(colon>0){
+        current={sender:rest.slice(0,colon).trim(), body:rest.slice(colon+2)};
+      }else{
+        current=null; // system notification
+      }
+    }else if(current && line.trim()){
+      current.body+='\n'+line;
+    }
+  }
+  if(current) messages.push(current);
+  return messages;
+}
+
+function csvCell(value){return '"'+String(value).replace(/"/g,'""')+'"';}
+function render(rows){
+  const total=rows.reduce((a,r)=>({sent:a.sent+r.sent,received:a.received+r.received}),{sent:0,received:0});
+  let html='<table><thead><tr><th>Chat / Kontakt</th><th>Gesendet</th><th>Empfangen</th><th>Gesamt</th></tr></thead><tbody>';
+  for(const r of rows){
+    html+='<tr><td>'+escapeHtml(r.name)+'</td><td>'+r.sent+'</td><td>'+r.received+'</td><td>'+(r.sent+r.received)+'</td></tr>';
+  }
+  html+='<tr class="total"><td>Insgesamt</td><td>'+total.sent+'</td><td>'+total.received+'</td><td>'+(total.sent+total.received)+'</td></tr></tbody></table>';
+  $('results').innerHTML=html;
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+$('countBtn').addEventListener('click',async()=>{
+  const files=[...$('files').files];
+  const own=$('ownName').value.trim();
+  $('status').textContent='';
+  $('results').innerHTML='';
+  latestRows=[];
+  $('csvBtn').disabled=true;
+  if(!files.length){$('status').innerHTML='<span class="error">Bitte wähle zuerst mindestens eine TXT-Datei aus.</span>';return;}
+  if(!own){$('status').innerHTML='<span class="error">Bitte trage zuerst deinen Namen so ein, wie er im Chat angezeigt wird.</span>';return;}
+  for(const file of files){
+    const text=await file.text();
+    const messages=parseChat(text);
+    let sent=0,received=0;
+    for(const m of messages){
+      if(m.sender.toLocaleLowerCase()===own.toLocaleLowerCase()) sent++;
+      else received++;
+    }
+    const name=file.name.replace(/\.txt$/i,'').replace(/^WhatsApp-Chat mit /i,'');
+    latestRows.push({name,sent,received});
+  }
+  latestRows.sort((a,b)=>a.name.localeCompare(b.name,'de'));
+  render(latestRows);
+  const n=latestRows.reduce((s,r)=>s+r.sent+r.received,0);
+  $('status').textContent='Fertig. '+n+' Nachrichten in '+latestRows.length+' Chatdatei(en) erkannt.';
+  $('csvBtn').disabled=false;
+});
+$('csvBtn').addEventListener('click',()=>{
+  if(!latestRows.length)return;
+  const lines=[['Chat / Kontakt','Gesendet','Empfangen','Gesamt'],...latestRows.map(r=>[r.name,r.sent,r.received,r.sent+r.received])];
+  const total=latestRows.reduce((a,r)=>({sent:a.sent+r.sent,received:a.received+r.received}),{sent:0,received:0});
+  lines.push(['Insgesamt',total.sent,total.received,total.sent+total.received]);
+  const csv='\uFEFF'+lines.map(row=>row.map(csvCell).join(';')).join('\r\n');
+  const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  const a=document.createElement('a');a.href=url;a.download='WhatsApp-Auswertung.csv';a.click();
+  URL.revokeObjectURL(url);
+});
+</script>
+</body>
+</html>
