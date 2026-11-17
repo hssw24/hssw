@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<!-- Wichtig fürs Handy: Seite an die Bildschirmbreite anpassen -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kapitalanlagen</title>
+
+<!-- SheetJS: Bibliothek zum Lesen/Schreiben von Excel-Dateien (braucht beim Laden Internet) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+/* ===== AUSSEHEN (CSS) ===== */
+/* Farben als Variablen: Hier ändern, und es gilt überall */
+:root { --bg:#f3f5f8; --card:#fff; --text:#1c2430; --main:#1f6feb; --line:#d9dee6; --warn:#c62828; }
+* { box-sizing: border-box; }               /* Breite inkl. Rand/Innenabstand rechnen */
+body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--text); }
+header { background:var(--main); color:#fff; padding:12px 16px; font-size:1.2em; font-weight:600; }
+main { max-width:900px; margin:0 auto; padding:10px; }
+.card { background:var(--card); border-radius:10px; padding:12px; margin-bottom:12px; box-shadow:0 1px 3px #0002; }
+h2 { margin:0 0 8px; font-size:1.05em; }
+label { display:block; font-size:.85em; margin-top:8px; }
+input, select, button { font-size:1em; padding:8px; border:1px solid var(--line); border-radius:6px; width:100%; }
+button { background:var(--main); color:#fff; border:0; cursor:pointer; width:auto; margin:6px 6px 0 0; }
+button.grau { background:#6b7686; }
+button.rot  { background:var(--warn); }
+.check { display:flex; align-items:center; gap:8px; }   /* Häkchen neben Text */
+.check input { width:auto; }
+.zeile { display:grid; grid-template-columns:1fr 1fr; gap:8px; }  /* 2 Spalten */
+.tabs button { background:#fff; color:var(--main); border:1px solid var(--main); }
+.tabs button.aktiv { background:var(--main); color:#fff; }
+table { width:100%; border-collapse:collapse; font-size:.9em; }
+th, td { text-align:left; padding:6px 4px; border-bottom:1px solid var(--line); }
+td.zahl, th.zahl { text-align:right; }
+.scroll { overflow-x:auto; }                /* breite Tabellen seitlich scrollbar */
+.klein { font-size:.8em; color:#667; }
+.item { border-bottom:1px solid var(--line); padding:8px 0; }
+.item:last-child { border-bottom:0; }
+.versteckt { display:none; }
+</style>
+</head>
+<body>
+
+<header>💶 Meine Kapitalanlagen</header>
+<main>
+
+<!-- ===== REITER-AUSWAHL ===== -->
+<div class="tabs">
+  <button id="t-anlagen" class="aktiv" onclick="zeigeTab('anlagen')">Anlagen</button>
+  <button id="t-auswertung" onclick="zeigeTab('auswertung')">Auswertung</button>
+</div>
+
+<!-- ===== REITER 1: ANLAGEN (Formular + Liste) ===== -->
+<section id="tab-anlagen">
+
+  <div class="card">
+    <h2 id="formTitel">Neue Anlage erfassen</h2>
+
+    <label>Bank
+      <!-- list="bankListe" verknüpft das Feld mit der Vorschlagsliste unten.
+           Beim Tippen/Antippen erscheinen die schon verwendeten Banknamen. -->
+      <input id="bank" list="bankListe" placeholder="z. B. Musterbank" autocomplete="off">
+    </label>
+    <datalist id="bankListe"></datalist>   <!-- wird per JavaScript befüllt -->
+
+    <div class="zeile">
+      <label>Start <input id="start" type="date"></label>
+      <label>Laufzeit (Monate) <input id="monate" type="number" min="1" step="1" placeholder="12"></label>
+    </div>
+    <div class="zeile">
+      <label>Zinssatz (% p. a.) <input id="zins" type="number" min="0" step="0.01" placeholder="3,25"></label>
+      <label>Betrag (€) <input id="betrag" type="number" min="0" step="0.01" placeholder="10000"></label>
+    </div>
+    <label class="check"><input id="verl" type="checkbox"> Automatische Verlängerung</label>
+    <label class="check"><input id="quelle" type="checkbox"> Quellensteuer (ausländische Anlage)</label>
+
+    <button onclick="speichern()">Speichern</button>
+    <button class="grau" onclick="formLeeren()">Abbrechen / Neu</button>
+  </div>
+
+  <div class="card">
+    <h2>Alle Anlagen</h2>
+    <label>Sortieren nach
+      <select id="sortierung" onchange="zeichne()">
+        <option value="faellig">Nächste Fälligkeit</option>
+        <option value="bank">Bank (A–Z)</option>
+        <option value="betrag">Betrag (absteigend)</option>
+        <option value="zins">Zinssatz (absteigend)</option>
+        <option value="start">Startdatum</option>
+      </select>
+    </label>
+    <div id="liste"></div>
+    <p class="klein" id="summe"></p>
+  </div>
+
+  <div class="card">
+    <h2>Daten sichern</h2>
+    <button onclick="exportXls()">⬇ Excel exportieren</button>
+    <button class="grau" onclick="document.getElementById('datei').click()">⬆ Excel importieren</button>
+    <!-- Das Dateifeld ist unsichtbar, der Button oben "klickt" es an -->
+    <input id="datei" type="file" accept=".xlsx,.xls" class="versteckt" onchange="importXls(event)">
+    <p class="klein">Import ersetzt alle vorhandenen Daten. Gespeichert wird lokal im Browser dieses Geräts.</p>
+  </div>
+</section>
+
+<!-- ===== REITER 2: AUSWERTUNG ===== -->
+<section id="tab-auswertung" class="versteckt">
+  <div class="card">
+    <h2>Voraussichtliche Zinszahlungen je Jahr</h2>
+    <p class="klein">Annahme: Zinsen werden jährlich zum Jahrestag des Starts ausgezahlt, der Rest am Laufzeitende.
+      Bei automatischer Verlängerung läuft die Anlage mit gleichen Konditionen weiter (ohne Zinseszins).</p>
+    <div class="scroll"><table id="jahrTabelle"></table></div>
+  </div>
+  <div class="card">
+    <h2>Nächste Zinszahlungen</h2>
+    <div id="nextZins"></div>
+  </div>
+  <div class="card">
+    <h2>Nächste Fälligkeiten</h2>
+    <div id="nextFaellig"></div>
+  </div>
+</section>
+
+</main>
+
+<script>
+/* ============================================================
+   JAVASCRIPT – hier steckt die Logik der App
+   ============================================================ */
+
+/* ---------- 1. DATEN ---------- */
+// Name, unter dem die Daten im Browser abgelegt werden
+const SPEICHER = 'kapitalanlagen_v1';
+
+// "anlagen" ist eine Liste (Array). Jede Anlage ist ein Objekt:
+// { id, bank, start:'2026-01-15', zins:3.25, betrag:10000, monate:12, verl:true/false, quelle:true/false }
+let anlagen = [];
+let bearbeiteId = null;   // null = neue Anlage, sonst ID der gerade bearbeiteten
+
+// Beim Start gespeicherte Daten laden (falls vorhanden)
+try { anlagen = JSON.parse(localStorage.getItem(SPEICHER)) || []; } catch (e) { anlagen = []; }
+
+// Daten dauerhaft im Browser speichern (localStorage speichert nur Text, daher JSON)
+function sichern() { localStorage.setItem(SPEICHER, JSON.stringify(anlagen)); }
+
+/* ---------- 2. HILFSFUNKTIONEN ---------- */
+// Euro und Datum im deutschen Format ausgeben
+const euro = n => n.toLocaleString('de-DE', { style:'currency', currency:'EUR' });
+const datumDe = d => d.toLocaleDateString('de-DE');
+
+// Text "2026-01-15" in ein Datum umwandeln (lokale Zeit, ohne Zeitzonen-Ärger)
+function parseDatum(s) { const [j, m, t] = s.split('-').map(Number); return new Date(j, m - 1, t); }
+
+// Datum in Text "2026-01-15" zurückwandeln (für Speicherung/Export)
+function datumText(d) {
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Monate zu einem Datum addieren. Beispiel: 31.01. + 1 Monat = 28.02. (nicht 03.03.)
+function addMonate(d, n) {
+  const ziel = new Date(d.getFullYear(), d.getMonth() + n, 1);
+  const letzterTag = new Date(ziel.getFullYear(), ziel.getMonth() + 1, 0).getDate();
+  ziel.setDate(Math.min(d.getDate(), letzterTag));
+  return ziel;
+}
+
+// Sonderzeichen entschärfen, bevor Text in HTML eingebaut wird (Sicherheit)
+function esc(t) { return String(t).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+// Heute um 0:00 Uhr
+function heute() { const h = new Date(); return new Date(h.getFullYear(), h.getMonth(), h.getDate()); }
+
+/* ---------- 3. BERECHNUNGEN ---------- */
+// Fälligkeitsdatum = Start + Laufzeit
+function faelligkeit(a) { return addMonate(parseDatum(a.start), a.monate); }
+
+// Nächste Fälligkeit ab heute. Bei automatischer Verlängerung wird die Laufzeit
+// so oft angehängt, bis das Datum in der Zukunft liegt. Ohne Verlängerung: null, wenn abgelaufen.
+function naechsteFaelligkeit(a) {
+  const start = parseDatum(a.start);
+  let n = 1, d = addMonate(start, a.monate);
+  while (d < heute()) {
+    if (!a.verl) return null;
+    n++; d = addMonate(start, a.monate * n);
+  }
+  return d;
+}
+
+// Alle Zinszahlungen einer Anlage bis zum Jahr "bisJahr" als Liste erzeugen.
+// Pro Laufzeit: ein Zins je vollem Jahr, am Ende der Rest (anteilig in Monaten).
+function zinsEreignisse(a, bisJahr) {
+  const out = [];
+  let laufStart = parseDatum(a.start);
+  let schutz = 0;                                // Schutz gegen Endlosschleife
+  while (laufStart.getFullYear() <= bisJahr && schutz++ < 200) {
+    const volleJahre = Math.floor((a.monate - 1) / 12);   // Jahrestage innerhalb der Laufzeit
+    for (let k = 1; k <= volleJahre; k++) {
+      out.push({ datum: addMonate(laufStart, 12 * k), zins: a.betrag * a.zins / 100, a });
+    }
+    const restMonate = a.monate - 12 * volleJahre;        // 1..12 Monate bis zur Fälligkeit
+    const ende = addMonate(laufStart, a.monate);
+    out.push({ datum: ende, zins: a.betrag * a.zins / 100 * restMonate / 12, a });
+    if (!a.verl) break;                                   // ohne Verlängerung: fertig
+    laufStart = ende;                                     // sonst nächste Laufzeit
+  }
+  return out;
+}
+
+/* ---------- 4. ANZEIGE ---------- */
+function zeichne() {
+  // 4a) Banknamen-Vorschläge: alle verwendeten Namen, ohne Doppelte (Set), sortiert
+  const banken = [...new Set(anlagen.map(a => a.bank))].sort((x, y) => x.localeCompare(y, 'de'));
+  document.getElementById('bankListe').innerHTML = banken.map(b => `<option value="${esc(b)}">`).join('');
+
+  // 4b) Anlagen sortieren
+  const modus = document.getElementById('sortierung').value;
+  const kopie = [...anlagen];   // Kopie, damit die Originalreihenfolge bleibt
+  kopie.sort((a, b) => {
+    if (modus === 'bank')   return a.bank.localeCompare(b.bank, 'de');
+    if (modus === 'betrag') return b.betrag - a.betrag;
+    if (modus === 'zins')   return b.zins - a.zins;
+    if (modus === 'start')  return a.start.localeCompare(b.start);
+    // "faellig": abgelaufene (null) ans Ende
+    const fa = naechsteFaelligkeit(a), fb = naechsteFaelligkeit(b);
+    if (!fa && !fb) return 0; if (!fa) return 1; if (!fb) return -1;
+    return fa - fb;
+  });
+
+  // 4c) Liste als HTML-Text zusammenbauen
+  document.getElementById('liste').innerHTML = kopie.map(a => {
+    const f = naechsteFaelligkeit(a);
+    return `<div class="item">
+      <b>${esc(a.bank)}</b> – ${euro(a.betrag)} zu ${a.zins.toLocaleString('de-DE')} %<br>
+      <span class="klein">Start ${datumDe(parseDatum(a.start))} · ${a.monate} Mon. ·
+      fällig ${f ? datumDe(f) : datumDe(faelligkeit(a)) + ' (abgelaufen)'}
+      ${a.verl ? '· 🔁 verlängert sich' : ''} ${a.quelle ? '· Quellensteuer' : ''}</span><br>
+      <button onclick="bearbeiten(${a.id})">Bearbeiten</button>
+      <button class="rot" onclick="loeschen(${a.id})">Löschen</button>
+    </div>`;
+  }).join('') || '<p class="klein">Noch keine Anlagen erfasst.</p>';
+
+  const summe = anlagen.reduce((s, a) => s + a.betrag, 0);
+  document.getElementById('summe').textContent = anlagen.length + ' Anlage(n), Summe ' + euro(summe);
+
+  zeichneAuswertung();
+}
+
+function zeichneAuswertung() {
+  const jahr = heute().getFullYear();
+  const bis = jahr + 5;                              // Auswertung: laufendes Jahr + 5 Jahre
+  const alle = anlagen.flatMap(a => zinsEreignisse(a, bis));   // alle Zinszahlungen aller Anlagen
+
+  // Tabelle: pro Jahr Summe gesamt und Summe nur Quellensteuer-Anlagen
+  let html = '<tr><th>Jahr</th><th class="zahl">Gesamt</th><th class="zahl">nur Quellensteuer</th></tr>';
+  for (let j = jahr; j <= bis; j++) {
+    const imJahr = alle.filter(e => e.datum.getFullYear() === j);
+    const gesamt = imJahr.reduce((s, e) => s + e.zins, 0);
+    const qst = imJahr.filter(e => e.a.quelle).reduce((s, e) => s + e.zins, 0);
+    html += `<tr><td>${j}</td><td class="zahl">${euro(gesamt)}</td><td class="zahl">${euro(qst)}</td></tr>`;
+  }
+  document.getElementById('jahrTabelle').innerHTML = html;
+
+  // Nächste Zinszahlungen: nur Zukunft, nach Datum sortiert, die ersten 10
+  const kommende = alle.filter(e => e.datum >= heute()).sort((x, y) => x.datum - y.datum).slice(0, 10);
+  document.getElementById('nextZins').innerHTML = kommende.map(e =>
+    `<div class="item">${datumDe(e.datum)} – <b>${esc(e.a.bank)}</b>: ${euro(e.zins)}${e.a.quelle ? ' (Quellensteuer)' : ''}</div>`
+  ).join('') || '<p class="klein">Keine anstehenden Zinszahlungen.</p>';
+
+  // Nächste Fälligkeiten: Anlagen mit Fälligkeit, nach Datum sortiert
+  const faellige = anlagen.map(a => ({ a, d: naechsteFaelligkeit(a) })).filter(x => x.d).sort((x, y) => x.d - y.d).slice(0, 10);
+  document.getElementById('nextFaellig').innerHTML = faellige.map(x =>
+    `<div class="item">${datumDe(x.d)} – <b>${esc(x.a.bank)}</b>: ${euro(x.a.betrag)} ${x.a.verl ? '🔁' : ''}</div>`
+  ).join('') || '<p class="klein">Keine anstehenden Fälligkeiten.</p>';
+}
+
+/* ---------- 5. ERFASSEN / ÄNDERN / LÖSCHEN (CRUD) ---------- */
+function speichern() {
+  // Werte aus dem Formular lesen
+  const neu = {
+    bank:   document.getElementById('bank').value.trim(),
+    start:  document.getElementById('start').value,
+    monate: parseInt(document.getElementById('monate').value, 10),
+    zins:   parseFloat(document.getElementById('zins').value),
+    betrag: parseFloat(document.getElementById('betrag').value),
+    verl:   document.getElementById('verl').checked,
+    quelle: document.getElementById('quelle').checked
+  };
+  // Einfache Prüfung der Eingaben
+  if (!neu.bank || !neu.start || !(neu.monate >= 1) || isNaN(neu.zins) || isNaN(neu.betrag)) {
+    alert('Bitte alle Felder ausfüllen (Laufzeit mindestens 1 Monat).'); return;
+  }
+  if (bearbeiteId === null) {
+    neu.id = Date.now();                 // Create: neue eindeutige ID (Zeitstempel)
+    anlagen.push(neu);
+  } else {
+    neu.id = bearbeiteId;                // Update: bestehenden Eintrag ersetzen
+    anlagen = anlagen.map(a => a.id === bearbeiteId ? neu : a);
+  }
+  sichern(); formLeeren(); zeichne();
+}
+
+function bearbeiten(id) {
+  const a = anlagen.find(x => x.id === id);          // Read: Eintrag suchen
+  bearbeiteId = id;
+  document.getElementById('bank').value = a.bank;
+  document.getElementById('start').value = a.start;
+  document.getElementById('monate').value = a.monate;
+  document.getElementById('zins').value = a.zins;
+  document.getElementById('betrag').value = a.betrag;
+  document.getElementById('verl').checked = a.verl;
+  document.getElementById('quelle').checked = a.quelle;
+  document.getElementById('formTitel').textContent = 'Anlage ändern';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function loeschen(id) {                              // Delete
+  if (!confirm('Diese Anlage wirklich löschen?')) return;
+  anlagen = anlagen.filter(a => a.id !== id);        // alle außer der gewählten behalten
+  sichern(); zeichne();
+}
+
+function formLeeren() {
+  bearbeiteId = null;
+  ['bank','start','monate','zins','betrag'].forEach(i => document.getElementById(i).value = '');
+  document.getElementById('verl').checked = false;
+  document.getElementById('quelle').checked = false;
+  document.getElementById('formTitel').textContent = 'Neue Anlage erfassen';
+}
+
+/* ---------- 6. EXCEL EXPORT / IMPORT ---------- */
+function exportXls() {
+  if (typeof XLSX === 'undefined') { alert('Excel-Bibliothek nicht geladen (Internet nötig).'); return; }
+  // Jede Anlage wird eine Excel-Zeile; Fälligkeit wird zur Info mit exportiert
+  const zeilen = anlagen.map(a => ({
+    Bank: a.bank, Start: a.start, Zinssatz: a.zins, Betrag: a.betrag, Laufzeit_Monate: a.monate,
+    Faelligkeit: datumText(faelligkeit(a)),
+    Verlaengerung: a.verl ? 'ja' : 'nein', Quellensteuer: a.quelle ? 'ja' : 'nein'
+  }));
+  const blatt = XLSX.utils.json_to_sheet(zeilen);
+  const mappe = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(mappe, blatt, 'Anlagen');
+  XLSX.writeFile(mappe, 'kapitalanlagen.xlsx');
+}
+
+// Excel-Datum kann Text ("2026-01-15") oder Zahl (Seriennummer) sein
+function alsDatumText(w) {
+  if (typeof w === 'number') return datumText(new Date(Math.round((w - 25569) * 86400000) + 12 * 3600000));
+  return String(w).slice(0, 10);
+}
+
+function importXls(ev) {
+  const datei = ev.target.files[0];
+  if (!datei) return;
+  if (typeof XLSX === 'undefined') { alert('Excel-Bibliothek nicht geladen (Internet nötig).'); return; }
+  if (!confirm('Alle vorhandenen Daten werden durch die Datei ersetzt. Fortfahren?')) { ev.target.value = ''; return; }
+  const leser = new FileReader();
+  leser.onload = e => {
+    try {
+      const mappe = XLSX.read(e.target.result, { type: 'array' });
+      const zeilen = XLSX.utils.sheet_to_json(mappe.Sheets[mappe.SheetNames[0]]);
+      anlagen = zeilen.map((z, i) => ({
+        id: Date.now() + i,
+        bank: String(z.Bank || '').trim(),
+        start: alsDatumText(z.Start),
+        zins: parseFloat(z.Zinssatz),
+        betrag: parseFloat(z.Betrag),
+        monate: parseInt(z.Laufzeit_Monate, 10),
+        verl: String(z.Verlaengerung).toLowerCase() === 'ja',
+        quelle: String(z.Quellensteuer).toLowerCase() === 'ja'
+      })).filter(a => a.bank && a.start && a.monate >= 1);   // unvollständige Zeilen überspringen
+      sichern(); zeichne();
+    } catch (err) { alert('Datei konnte nicht gelesen werden.'); }
+    ev.target.value = '';                             // damit dieselbe Datei erneut wählbar ist
+  };
+  leser.readAsArrayBuffer(datei);
+}
+
+/* ---------- 7. REITER UMSCHALTEN ---------- */
+function zeigeTab(name) {
+  ['anlagen', 'auswertung'].forEach(n => {
+    document.getElementById('tab-' + n).classList.toggle('versteckt', n !== name);
+    document.getElementById('t-' + n).classList.toggle('aktiv', n === name);
+  });
+}
+
+/* ---------- 8. START ---------- */
+zeichne();   // beim Öffnen der Seite alles anzeigen
+</script>
+</body>
+</html>
+
