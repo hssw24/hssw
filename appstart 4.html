@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mein App Launcher</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card-hover: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #38bdf8;
+      --danger: #ef4444;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    h1 { font-size: 1.35rem; font-weight: 700; }
+
+    .toolbar { display: flex; gap: 8px; }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    button:active { transform: scale(0.97); }
+
+    .btn-primary { background: var(--accent); color: #0f172a; }
+    .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-icon { padding: 6px 10px; font-size: 0.85rem; background: #0f172a88; color: var(--text); }
+
+    #app-grid {
+      width: 100%;
+      max-width: 640px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 14px;
+    }
+
+    .app-card {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      transition: background 0.15s, transform 0.15s, opacity 0.15s;
+      user-select: none;
+    }
+    .app-card:hover { background: var(--card-hover); }
+    .app-card.dragging { opacity: 0.4; transform: scale(0.96); }
+    .app-card.drag-over { border: 2px dashed var(--accent); }
+
+    .app-link {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 22px 12px 18px;
+      text-decoration: none;
+      color: var(--text);
+      gap: 12px;
+      width: 100%;
+      height: 100%;
+    }
+
+    .app-logo {
+      width: 56px;
+      height: 56px;
+      border-radius: 14px;
+      object-fit: cover;
+      background: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    }
+    .app-logo img, .app-logo svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    .app-name {
+      font-size: 0.95rem;
+      font-weight: 600;
+      text-align: center;
+      word-break: break-word;
+    }
+
+    .edit-controls {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.88);
+      border-radius: 16px;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 10px;
+    }
+    body.edit-mode .edit-controls { display: flex; }
+    body.edit-mode .app-card { cursor: grab; }
+
+    .edit-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+    }
+
+    /* Eigenes Overlay-Modal (kompatibel mit allen WebViews / SPCK) */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.75);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open {
+      display: flex;
+    }
+    .modal-box {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px;
+      width: 100%;
+      max-width: 420px;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .form-group { margin-bottom: 14px; }
+    label { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 5px; }
+    input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+    .hint { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>Meine Apps</h1>
+    <div class="toolbar">
+      <button type="button" class="btn-secondary" id="toggle-edit-btn">Bearbeiten</button>
+      <button type="button" class="btn-primary" id="add-app-btn">+ App</button>
+    </div>
+  </header>
+
+  <main id="app-grid"></main>
+
+  <div class="modal-backdrop" id="app-modal">
+    <div class="modal-box">
+      <form id="app-form">
+        <h2 id="modal-title" style="margin-bottom: 16px; font-size: 1.15rem;">App hinzufügen</h2>
+        <input type="hidden" id="app-id">
+
+        <div class="form-group">
+          <label for="app-name">App-Name *</label>
+          <input type="text" id="app-name" placeholder="z. B. Bitchat" required>
+        </div>
+
+        <div class="form-group">
+          <label for="app-pkg">Android Package Name</label>
+          <input type="text" id="app-pkg" placeholder="z. B. com.bitchat.droid">
+          <div class="hint">Aus Play-Store-URL nach ?id=</div>
+        </div>
+
+        <div class="form-group">
+          <label for="app-ios">iOS App-Store-URL oder ID</label>
+          <input type="text" id="app-ios" placeholder="z. B. 6748219622 oder https://apps.apple.com/...">
+        </div>
+
+        <div class="form-group">
+          <label for="app-web">Web-Fallback URL (Desktop / Sonstige)</label>
+          <input type="url" id="app-web" placeholder="https://bitchat.free/">
+        </div>
+
+        <div class="form-group">
+          <label for="app-icon">Logo-URL (optional)</label>
+          <input type="text" id="app-icon" placeholder="https://... oder leer lassen für Standard-Icon">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-modal">Abbrechen</button>
+          <button type="submit" class="btn-primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      var BITCHAT_SVG = "data:image/svg+xml;utf8," + encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">' +
+        '<rect width="120" height="120" rx="24" fill="#000000"/>' +
+        '<text x="60" y="75" font-family="monospace, sans-serif" font-weight="900" font-size="46" fill="#ffffff" text-anchor="middle" letter-spacing="-2">bit</text>' +
+        '</svg>'
+      );
+
+      var STORAGE_KEY = "custom_app_launcher_v2";
+      var DEFAULT_APPS = [
+        {
+          id: "bitchat-default",
+          name: "Bitchat",
+          androidPkg: "com.bitchat.droid",
+          iosUrl: "https://apps.apple.com/de/app/bitchat-mesh/id6748219622",
+          webUrl: "https://bitchat.free/",
+          icon: BITCHAT_SVG
+        }
+      ];
+
+      function loadApps() {
+        try {
+          var raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          }
+        } catch (e) {}
+        return JSON.parse(JSON.stringify(DEFAULT_APPS));
+      }
+
+      function saveApps() {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(apps));
+        } catch (e) {}
+      }
+
+      var apps = loadApps();
+      var editMode = false;
+      var draggedIndex = null;
+
+      var grid = document.getElementById("app-grid");
+      var modal = document.getElementById("app-modal");
+      var form = document.getElementById("app-form");
+      var toggleEditBtn = document.getElementById("toggle-edit-btn");
+
+      var ua = navigator.userAgent || "";
+      var isAndroid = /Android/i.test(ua);
+      var isIOS = /iPhone|iPad|iPod/i.test(ua) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+
+      function buildTargetUrl(app) {
+        if (isAndroid && app.androidPkg) {
+          return "intent://#Intent;package=" + app.androidPkg.trim() + ";action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end;";
+        }
+        if (isIOS && app.iosUrl) {
+          var val = app.iosUrl.trim();
+          return /^\d+$/.test(val) ? "https://apps.apple.com/app/id" + val : val;
+        }
+        if (app.webUrl) return app.webUrl.trim();
+        if (app.androidPkg) return "https://play.google.com/store/apps/details?id=" + app.androidPkg.trim();
+        if (app.iosUrl) return app.iosUrl.trim();
+        return "#";
+      }
+
+      function getFallbackIcon(name) {
+        var letter = (name || "?").trim().charAt(0).toUpperCase();
+        return "data:image/svg+xml;utf8," + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">' +
+          '<rect width="100" height="100" fill="#334155"/>' +
+          '<text x="50" y="66" font-family="sans-serif" font-weight="700" font-size="48" fill="#38bdf8" text-anchor="middle">' + letter + '</text>' +
+          '</svg>'
+        );
+      }
+
+      function openModal() {
+        modal.classList.add("open");
+      }
+
+      function closeModal() {
+        modal.classList.remove("open");
+      }
+
+      function render() {
+        grid.innerHTML = "";
+        apps.forEach(function(app, index) {
+          var card = document.createElement("div");
+          card.className = "app-card";
+          card.draggable = editMode;
+
+          var iconSrc = app.icon && app.icon.trim() ? app.icon.trim() : getFallbackIcon(app.name);
+          var href = buildTargetUrl(app);
+
+          var link = document.createElement("a");
+          link.className = "app-link";
+          link.href = href;
+          if (editMode) {
+            link.addEventListener("click", function(e) { e.preventDefault(); });
+          }
+
+          var logoWrap = document.createElement("div");
+          logoWrap.className = "app-logo";
+          var img = document.createElement("img");
+          img.src = iconSrc;
+          img.alt = app.name;
+          img.onerror = function() { this.src = getFallbackIcon(app.name); };
+          logoWrap.appendChild(img);
+
+          var nameSpan = document.createElement("span");
+          nameSpan.className = "app-name";
+          nameSpan.textContent = app.name;
+
+          link.appendChild(logoWrap);
+          link.appendChild(nameSpan);
+          card.appendChild(link);
+
+          var controls = document.createElement("div");
+          controls.className = "edit-controls";
+
+          var row1 = document.createElement("div");
+          row1.className = "edit-row";
+
+          var btnLeft = document.createElement("button");
+          btnLeft.type = "button";
+          btnLeft.className = "btn-icon";
+          btnLeft.textContent = "◀";
+          btnLeft.addEventListener("click", function() { moveApp(index, -1); });
+
+          var btnRight = document.createElement("button");
+          btnRight.type = "button";
+          btnRight.className = "btn-icon";
+          btnRight.textContent = "▶";
+          btnRight.addEventListener("click", function() { moveApp(index, 1); });
+
+          row1.appendChild(btnLeft);
+          row1.appendChild(btnRight);
+
+          var row2 = document.createElement("div");
+          row2.className = "edit-row";
+
+          var btnEdit = document.createElement("button");
+          btnEdit.type = "button";
+          btnEdit.className = "btn-icon";
+          btnEdit.textContent = "Edit";
+          btnEdit.addEventListener("click", function() { openEditModal(app.id); });
+
+          var btnDel = document.createElement("button");
+          btnDel.type = "button";
+          btnDel.className = "btn-icon btn-danger";
+          btnDel.textContent = "X";
+          btnDel.addEventListener("click", function() { deleteApp(app.id); });
+
+          row2.appendChild(btnEdit);
+          row2.appendChild(btnDel);
+
+          controls.appendChild(row1);
+          controls.appendChild(row2);
+          card.appendChild(controls);
+
+          card.addEventListener("dragstart", function() {
+            draggedIndex = index;
+            card.classList.add("dragging");
+          });
+          card.addEventListener("dragend", function() {
+            card.classList.remove("dragging");
+            document.querySelectorAll(".app-card").forEach(function(c) { c.classList.remove("drag-over"); });
+          });
+          card.addEventListener("dragover", function(e) {
+            if (!editMode) return;
+            e.preventDefault();
+            card.classList.add("drag-over");
+          });
+          card.addEventListener("dragleave", function() { card.classList.remove("drag-over"); });
+          card.addEventListener("drop", function(e) {
+            e.preventDefault();
+            if (draggedIndex === null || draggedIndex === index) return;
+            var moved = apps.splice(draggedIndex, 1)[0];
+            apps.splice(index, 0, moved);
+            draggedIndex = null;
+            saveApps();
+            render();
+          });
+
+          grid.appendChild(card);
+        });
+      }
+
+      function moveApp(index, direction) {
+        var target = index + direction;
+        if (target < 0 || target >= apps.length) return;
+        var temp = apps[index];
+        apps[index] = apps[target];
+        apps[target] = temp;
+        saveApps();
+        render();
+      }
+
+      function deleteApp(id) {
+        apps = apps.filter(function(a) { return a.id !== id; });
+        saveApps();
+        render();
+      }
+
+      function openEditModal(id) {
+        var app = apps.find(function(a) { return a.id === id; });
+        if (!app) return;
+        document.getElementById("modal-title").textContent = "App bearbeiten";
+        document.getElementById("app-id").value = app.id;
+        document.getElementById("app-name").value = app.name;
+        document.getElementById("app-pkg").value = app.androidPkg || "";
+        document.getElementById("app-ios").value = app.iosUrl || "";
+        document.getElementById("app-web").value = app.webUrl || "";
+        document.getElementById("app-icon").value = app.icon === BITCHAT_SVG ? "" : (app.icon || "");
+        openModal();
+      }
+
+      document.getElementById("add-app-btn").addEventListener("click", function() {
+        form.reset();
+        document.getElementById("app-id").value = "";
+        document.getElementById("modal-title").textContent = "Neue App hinzufügen";
+        openModal();
+      });
+
+      document.getElementById("cancel-modal").addEventListener("click", closeModal);
+      modal.addEventListener("click", function(e) {
+        if (e.target === modal) closeModal();
+      });
+
+      form.addEventListener("submit", function(e) {
+        e.preventDefault();
+        var id = document.getElementById("app-id").value;
+        var existing = apps.find(function(a) { return a.id === id; });
+        var customIcon = document.getElementById("app-icon").value.trim();
+
+        var entry = {
+          id: id || "app-" + Date.now(),
+          name: document.getElementById("app-name").value.trim(),
+          androidPkg: document.getElementById("app-pkg").value.trim(),
+          iosUrl: document.getElementById("app-ios").value.trim(),
+          webUrl: document.getElementById("app-web").value.trim(),
+          icon: customIcon || (existing && existing.icon === BITCHAT_SVG ? BITCHAT_SVG : "")
+        };
+
+        if (existing) {
+          Object.assign(existing, entry);
+        } else {
+          apps.push(entry);
+        }
+
+        saveApps();
+        render();
+        closeModal();
+      });
+
+      toggleEditBtn.addEventListener("click", function() {
+        editMode = !editMode;
+        document.body.classList.toggle("edit-mode", editMode);
+        toggleEditBtn.textContent = editMode ? "Fertig" : "Bearbeiten";
+        render();
+      });
+
+      render();
+    })();
+  </script>
+</body>
+</html>
