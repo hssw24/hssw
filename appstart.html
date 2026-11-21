@@ -40,7 +40,11 @@
 
       if (isAndroid) {
         // Öffnet Bitchat direkt auf Android (inkl. Fallback auf Play Store)
-        btn.href = 'intent://#Intent;package=com.bitchat.droid;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end;';
+        
+// jetzt direkt 
+btn.href = 'intent://#Intent;package=com.bitchat.droid;end;';
+
+//        btn.href = 'intent://#Intent;package=com.bitchat.droid;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end;';
       } else if (isIOS) {
         // Öffnet auf iOS den App Store (zeigt dort "Öffnen", falls installiert)
         btn.href = 'https://apple.com';
