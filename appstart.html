@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bitchat öffnen</title>
+  <style>
+    .bitchat-btn {
+      display: inline-block;
+      padding: 14px 24px;
+      font-family: system-ui, -apple-system, sans-serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: #ffffff;
+      background-color: #111827;
+      border-radius: 8px;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    .bitchat-btn:active {
+      opacity: 0.85;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Universeller Button -->
+  <a id="bitchat-link" href="https://bitchat.free" class="bitchat-btn">
+    Bitchat öffnen
+  </a>
+
+  <script>
+    (function () {
+      const btn = document.getElementById('bitchat-link');
+      const ua = navigator.userAgent || '';
+
+      const isAndroid = /Android/i.test(ua);
+      const isIOS = /iPhone|iPad|iPod/i.test(ua) ||
+        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+      if (isAndroid) {
+        // Öffnet Bitchat direkt auf Android (inkl. Fallback auf Play Store)
+        btn.href = 'intent://#Intent;package=com.bitchat.droid;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end;';
+      } else if (isIOS) {
+        // Öffnet auf iOS den App Store (zeigt dort "Öffnen", falls installiert)
+        btn.href = 'https://apple.com';
+        btn.textContent = 'Bitchat im App Store öffnen';
+      } else {
+        // Desktop / Sonstige Geräte
+        btn.href = 'https://bitchat.free';
+      }
+    })();
+  </script>
+
+</body>
+</html>
