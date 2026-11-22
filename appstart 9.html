@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>hssw</title>
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="hssw">
+  <link id="apple-touch-icon" rel="apple-touch-icon" href="">
+  <link id="app-favicon" rel="icon" type="image/png" href="">
+  <link id="pwa-manifest" rel="manifest" href="">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card: #1e293b;
+      --card-hover: #334155;
+      --text: #f8fafc;
+      --muted: #94a3b8;
+      --accent: #a3e635;
+      --accent-blue: #38bdf8;
+      --danger: #ef4444;
+      --border: #334155;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 16px 12px 40px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    header {
+      width: 100%;
+      max-width: 640px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      gap: 8px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .brand-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 7px;
+      background: #000000;
+      border: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    h1 { font-size: 1.25rem; font-weight: 700; letter-spacing: 0.02em; }
+
+    .toolbar { display: flex; gap: 6px; flex-wrap: wrap; }
+
+    button {
+      font-family: inherit;
+      cursor: pointer;
+      border: none;
+      border-radius: 8px;
+      padding: 7px 11px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: opacity 0.15s, transform 0.1s, background 0.15s;
+    }
+    button:active { transform: scale(0.97); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .btn-primary { background: var(--accent); color: #0f172a; }
+    .btn-secondary { background: var(--card); color: var(--text); border: 1px solid var(--border); }
+    .btn-accent-outline { background: rgba(163, 230, 53, 0.14); color: var(--accent); border: 1px solid rgba(163, 230, 53, 0.45); }
+    .btn-danger { background: var(--danger); color: #fff; }
+    .btn-icon {
+      padding: 6px 8px;
+      font-size: 0.85rem;
+      background: #1e293b;
+      color: #f8fafc;
+      border: 1px solid #475569;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+      line-height: 1;
+    }
+    .btn-icon.btn-danger {
+      background: var(--danger);
+      border-color: #f87171;
+      color: #ffffff;
+    }
+
+    /* 4 Buttons nebeneinander auf normalem Handydisplay */
+    #app-grid {
+      width: 100%;
+      max-width: 640px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .empty-state {
+      grid-column: 1 / -1;
+      background: var(--card);
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      padding: 32px 18px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.92rem;
+      line-height: 1.5;
+    }
+
+    .app-card {
+      position: relative;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      transition: background 0.15s, transform 0.15s, opacity 0.15s;
+      user-select: none;
+      overflow: hidden;
+    }
+    .app-card:hover { background: var(--card-hover); }
+    .app-card.dragging { opacity: 0.4; transform: scale(0.96); }
+    .app-card.drag-over { border: 2px dashed var(--accent); }
+
+    .app-link {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 8px 5px 8px;
+      text-decoration: none;
+      color: var(--text);
+      gap: 6px;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* Icons maximal groß im Kachelrahmen */
+    .app-logo {
+      width: 100%;
+      aspect-ratio: 1 / 1;
+      max-width: 84px;
+      border-radius: 13px;
+      background: #0f172a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      box-shadow: 0 3px 10px rgba(0,0,0,0.4);
+      flex-shrink: 0;
+    }
+    .app-logo img, .app-logo svg {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .app-name {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-align: center;
+      line-height: 1.2;
+      width: 100%;
+      overflow: hidden;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      word-break: break-word;
+    }
+
+    /* Bearbeitungs-Overlay (Edit Mode) - gut erkennbare Icons */
+    .edit-controls {
+      display: none;
+      position: absolute;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.86);
+      backdrop-filter: blur(2px);
+      border-radius: 13px;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 6px;
+    }
+    body.edit-mode .edit-controls { display: flex; }
+    body.edit-mode .app-card { cursor: grab; }
+
+    .edit-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 4px;
+    }
+
+    .edit-row .btn-icon {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 2px;
+      font-size: 0.85rem;
+    }
+
+    /* Custom Modal Overlay */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.78);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 12px;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    .modal-box {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+      width: 100%;
+      max-width: 460px;
+      max-height: 92vh;
+      overflow-y: auto;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .modal-header h2 { font-size: 1.1rem; }
+
+    /* Anleitung im Modal */
+    details.guide-box {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      font-size: 0.82rem;
+    }
+    details.guide-box summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--accent);
+      user-select: none;
+    }
+    .guide-content {
+      margin-top: 10px;
+      color: #cbd5e1;
+      line-height: 1.5;
+    }
+    .guide-content ol, .guide-content ul {
+      padding-left: 18px;
+      margin-top: 4px;
+      margin-bottom: 8px;
+    }
+    .guide-content li { margin-bottom: 5px; }
+    .guide-content code {
+      background: #1e293b;
+      padding: 1px 5px;
+      border-radius: 4px;
+      color: var(--accent);
+      font-size: 0.78rem;
+    }
+
+    .form-group { margin-bottom: 12px; }
+    .label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+      gap: 6px;
+    }
+    label { display: block; font-size: 0.82rem; color: var(--muted); }
+    input, textarea {
+      width: 100%;
+      padding: 9px 11px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+    .hint { font-size: 0.74rem; color: var(--muted); margin-top: 3px; }
+    .status-msg { font-size: 0.78rem; margin-top: 4px; min-height: 1.1em; color: var(--accent); }
+
+    /* Logo-Vorschau im Bearbeiten-Fenster */
+    .logo-preview-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .logo-preview-box {
+      width: 44px;
+      height: 44px;
+      border-radius: 10px;
+      background: #0f172a;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .logo-preview-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    /* Test-Leiste im Bearbeiten-Fenster */
+    .test-panel {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-top: 12px;
+    }
+    .test-panel-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+    .test-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+    }
+    .btn-test {
+      background: var(--card);
+      color: var(--text);
+      border: 1px solid var(--border);
+      padding: 7px 6px;
+      font-size: 0.78rem;
+      text-align: center;
+    }
+    .btn-test:hover { border-color: var(--accent); }
+
+    .modal-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 16px;
+      flex-wrap: wrap;
+    }
+    .backup-section {
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+      margin-top: 14px;
+    }
+    .backup-section:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+    .backup-buttons { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--accent);
+      color: #0f172a;
+      font-weight: 700;
+      padding: 10px 18px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+      z-index: 2000;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.4);
+      white-space: nowrap;
+    }
+    .toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="brand">
+      <div class="brand-icon" aria-hidden="true">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#a3e635" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </div>
+      <h1>hssw</h1>
+    </div>
+    <div class="toolbar">
+      <button type="button" class="btn-secondary" id="backup-btn">Teilen</button>
+      <button type="button" class="btn-secondary" id="toggle-edit-btn">Sortieren</button>
+      <button type="button" class="btn-primary" id="add-app-btn">+ App</button>
+    </div>
+  </header>
+
+  <main id="app-grid"></main>
+
+  <!-- Modal für Erstellen & Bearbeiten -->
+  <div class="modal-backdrop" id="app-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2 id="modal-title">App hinzufügen</h2>
+        <button type="button" class="btn-secondary" id="close-app-modal-x" style="padding: 4px 10px;">✕</button>
+      </div>
+
+      <!-- Ausklappbare Anleitung -->
+      <details class="guide-box">
+        <summary>📖 Anleitung: So legst du Apps richtig an</summary>
+        <div class="guide-content">
+          <ol>
+            <li><strong>Android-Package-Name ermitteln:</strong><br>
+              • <em>Im Play Store (Web):</em> App im Browser suchen und auf die Adresszeile schauen – der Text nach <code>?id=</code> ist der Package-Name (z. B. <code>org.telegram.messenger</code>).<br>
+              • <em>In der Play-Store-App:</em> Oben rechts auf die <strong>drei Punkte → Teilen → Link kopieren</strong> und irgendwo einfügen, um den Teil nach <code>?id=</code> abzulesen.<br>
+              • <em>Auf dem Smartphone (je nach System):</em> In den Android-Einstellungen unter <em>Apps → [App]</em> steht der Name ganz unten (bei <strong>Xiaomi HyperOS</strong> ist diese Anzeige allerdings ausgeblendet – dort hilft der Play-Store-Link oder eine App wie <em>App Inspector</em>).
+            </li>
+            <li><strong>Auto-Daten nutzen:</strong><br>
+              Trage zuerst den <strong>App-Namen</strong> und/oder den <strong>Android-Package-Namen</strong> ein und tippe auf <strong>„✨ Auto-Daten“</strong>. Das Tool sucht dann automatisch die <em>iOS-Store-URL</em>, die <em>Web-Fallback-URL</em> und das <em>Logo</em>.
+            </li>
+            <li><strong>Vor dem Speichern testen:</strong><br>
+              Nutze unten die drei <strong>Test-Buttons (Android, iOS, Web)</strong>, um zu prüfen, ob alle Links korrekt aufgelöst werden.
+            </li>
+          </ol>
+        </div>
+      </details>
+
+      <form id="app-form">
+        <input type="hidden" id="app-id">
+
+        <div class="form-group">
+          <div class="label-row">
+            <label for="app-name">App-Name *</label>
+            <button type="button" class="btn-accent-outline" id="auto-fill-btn" style="padding: 4px 10px; font-size: 0.76rem;">
+              ✨ Auto-Daten
+            </button>
+          </div>
+          <input type="text" id="app-name" placeholder="z. B. Signal" required>
+        </div>
+
+        <div class="form-group">
+          <label for="app-pkg">Android Package Name</label>
+          <input type="text" id="app-pkg" placeholder="z. B. org.thoughtcrime.securesms">
+          <div class="hint">Text nach <code>?id=</code> in der Play-Store-URL</div>
+        </div>
+
+        <div class="form-group">
+          <label for="app-ios">iOS App-Store-URL oder ID</label>
+          <input type="text" id="app-ios" placeholder="z. B. https://apps.apple.com/de/app/id874139669">
+        </div>
+
+        <div class="form-group">
+          <label for="app-web">Web-Fallback URL (Desktop / Sonstige)</label>
+          <input type="text" id="app-web" placeholder="z. B. https://signal.org">
+        </div>
+
+        <div class="form-group">
+          <label for="app-icon">Logo-URL</label>
+          <div class="logo-preview-row">
+            <div class="logo-preview-box">
+              <img id="modal-logo-preview" src="" alt="Vorschau">
+            </div>
+            <input type="text" id="app-icon" placeholder="Wird automatisch ermittelt oder eigene URL">
+          </div>
+          <div class="status-msg" id="lookup-status"></div>
+        </div>
+
+        <!-- Einzelne Testmöglichkeiten -->
+        <div class="test-panel">
+          <div class="test-panel-title">🔍 Ziel-Links einzeln testen (öffnet neuen Tab):</div>
+          <div class="test-buttons">
+            <button type="button" class="btn-test" id="test-android-btn">🤖 Android</button>
+            <button type="button" class="btn-test" id="test-ios-btn">🍎 iOS</button>
+            <button type="button" class="btn-test" id="test-web-btn">🌐 Web</button>
+          </div>
+          <div class="hint" id="test-preview-url" style="margin-top: 6px; word-break: break-all;"></div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-secondary" id="cancel-modal">Abbrechen</button>
+          <button type="submit" class="btn-primary">Speichern</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal für Teilen & Backup -->
+  <div class="modal-backdrop" id="backup-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Teilen & Backup</h2>
+        <button type="button" class="btn-secondary" id="close-backup-modal-x" style="padding: 4px 10px;">✕</button>
+      </div>
+
+      <div class="backup-section">
+        <label style="font-weight: 600; color: var(--text);">1. Als teilbarer URL-Link (für andere Geräte)</label>
+        <p class="hint" style="margin-bottom: 6px;">
+          Kodiert deine aktuelle App-Liste direkt in einen Link. Beim Öffnen werden die Buttons im anderen Browser gespeichert.
+        </p>
+        <div class="backup-buttons">
+          <button type="button" class="btn-primary" id="copy-share-link-btn">🔗 Link kopieren</button>
+          <button type="button" class="btn-secondary" id="native-share-btn" style="display:none;">📤 Teilen...</button>
+        </div>
+      </div>
+
+      <div class="backup-section">
+        <label style="font-weight: 600; color: var(--text);">2. JSON-Backup exportieren</label>
+        <div class="backup-buttons">
+          <button type="button" class="btn-secondary" id="export-file-btn">⬇️ JSON-Datei</button>
+          <button type="button" class="btn-secondary" id="export-copy-btn">📋 JSON kopieren</button>
+        </div>
+      </div>
+
+      <div class="backup-section">
+        <label style="font-weight: 600; color: var(--text);">3. JSON-Backup importieren</label>
+        <div class="backup-buttons" style="margin-bottom: 10px;">
+          <button type="button" class="btn-secondary" id="import-file-trigger">⬆️ JSON-Datei wählen</button>
+          <input type="file" id="import-file-input" accept=".json,application/json" style="display: none;">
+        </div>
+        <textarea id="import-text" rows="3" placeholder="Oder JSON-Text hier einfügen..."></textarea>
+        <div class="modal-actions" style="margin-top: 8px;">
+          <button type="button" class="btn-primary" id="import-text-btn">Importieren</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal für URL-Link Import -->
+  <div class="modal-backdrop" id="url-import-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h2>Geteilte App-Liste gefunden</h2>
+      </div>
+      <p id="url-import-info" style="font-size: 0.9rem; color: var(--muted); line-height: 1.5; margin-bottom: 14px;"></p>
+      <div class="modal-actions">
+        <button type="button" class="btn-secondary" id="url-import-cancel">Abbrechen</button>
+        <button type="button" class="btn-secondary" id="url-import-merge">Hinzufügen</button>
+        <button type="button" class="btn-primary" id="url-import-replace">Ersetzen</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Gespeichert</div>
+
+  <script>
+    // --- PWA Setup (Icon: schwarzer Hintergrund, gelbgrünes Zahnrad, Titel: hssw) ---
+    (function initPWA() {
+      try {
+        const size = 512;
+        const canvas = document.createElement('canvas');
+        canvas.width = size;
+        canvas.height = size;
+        const ctx = canvas.getContext('2d');
+
+        // Schwarzer Hintergrund
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, size, size);
+
+        // Gelbgrünes Zahnrad (#a3e635) zeichnen
+        const cx = size / 2;
+        const cy = size / 2;
+        const teeth = 8;
+        const outerR = 175;
+        const innerR = 132;
+        const holeR = 62;
+
+        ctx.save();
+        ctx.translate(cx, cy);
+        ctx.fillStyle = '#a3e635';
+        ctx.beginPath();
+        for (let i = 0; i < teeth; i++) {
+          const baseAngle = (i * 2 * Math.PI) / teeth;
+          const step = (2 * Math.PI) / (teeth * 4);
+          ctx.lineTo(Math.cos(baseAngle - step * 1.3) * innerR, Math.sin(baseAngle - step * 1.3) * innerR);
+          ctx.lineTo(Math.cos(baseAngle - step * 0.75) * outerR, Math.sin(baseAngle - step * 0.75) * outerR);
+          ctx.lineTo(Math.cos(baseAngle + step * 0.75) * outerR, Math.sin(baseAngle + step * 0.75) * outerR);
+          ctx.lineTo(Math.cos(baseAngle + step * 1.3) * innerR, Math.sin(baseAngle + step * 1.3) * innerR);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Inneres Loch im Zahnrad (schwarz)
+        ctx.fillStyle = '#000000';
+        ctx.beginPath();
+        ctx.arc(0, 0, holeR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        const iconDataUrl = canvas.toDataURL('image/png');
+        document.getElementById('apple-touch-icon').href = iconDataUrl;
+        document.getElementById('app-favicon').href = iconDataUrl;
+
+        const manifest = {
+          name: 'hssw',
+          short_name: 'hssw',
+          start_url: location.pathname || './',
+          display: 'standalone',
+          background_color: '#000000',
+          theme_color: '#000000',
+          icons: [
+            { src: iconDataUrl, sizes: '512x512', type: 'image/png', purpose: 'any maskable' }
+          ]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/manifest+json' });
+        document.getElementById('pwa-manifest').href = URL.createObjectURL(manifestBlob);
+
+        // Minimaler Service Worker für Offline-Fähigkeit (auf HTTPS / Vercel)
+        if ('serviceWorker' in navigator && location.protocol === 'https:') {
+          const swCode = `
+            const CACHE = 'hssw-v2';
+            self.addEventListener('install', e => {
+              e.waitUntil(caches.open(CACHE).then(c => c.addAll([location.pathname])));
+              self.skipWaiting();
+            });
+            self.addEventListener('fetch', e => {
+              if (e.request.method !== 'GET') return;
+              e.respondWith(
+                fetch(e.request).then(res => {
+                  const copy = res.clone();
+                  caches.open(CACHE).then(c => c.put(e.request, copy));
+                  return res;
+                }).catch(() => caches.match(e.request))
+              );
+            });
+          `;
+          const swBlob = new Blob([swCode], { type: 'application/javascript' });
+          navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(() => {});
+        }
+      } catch (e) {}
+    })();
+
+    // --- App Launcher Logik ---
+    const STORAGE_KEY = 'hssw_app_launcher_v1';
+    const DEFAULT_APPS = [];
+
+    function loadAppsFromStorage() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw !== null) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) return parsed;
+        }
+      } catch (e) {}
+      return DEFAULT_APPS;
+    }
+
+    function saveApps() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(apps));
+      } catch (e) {}
+    }
+
+    let apps = loadAppsFromStorage();
+    let editMode = false;
+    let draggedIndex = null;
+    let pendingSharedApps = null;
+
+    const grid = document.getElementById('app-grid');
+    const appModal = document.getElementById('app-modal');
+    const backupModal = document.getElementById('backup-modal');
+    const urlImportModal = document.getElementById('url-import-modal');
+    const form = document.getElementById('app-form');
+    const toggleEditBtn = document.getElementById('toggle-edit-btn');
+    const toastEl = document.getElementById('toast');
+    const statusEl = document.getElementById('lookup-status');
+    const previewUrlEl = document.getElementById('test-preview-url');
+    const modalLogoPreview = document.getElementById('modal-logo-preview');
+
+    function showToast(msg) {
+      toastEl.textContent = msg;
+      toastEl.classList.add('show');
+      clearTimeout(toastEl._timer);
+      toastEl._timer = setTimeout(() => toastEl.classList.remove('show'), 2600);
+    }
+
+    function encodeSharePayload(list) {
+      const compact = list.map(a => ({
+        n: a.name,
+        p: a.androidPkg || '',
+        i: a.iosUrl || '',
+        w: a.webUrl || '',
+        c: a.icon || ''
+      }));
+      const json = JSON.stringify(compact);
+      const bytes = new TextEncoder().encode(json);
+      let bin = '';
+      bytes.forEach(b => bin += String.fromCharCode(b));
+      return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    function decodeSharePayload(encoded) {
+      let b64 = encoded.replace(/-/g, '+').replace(/_/g, '/');
+      while (b64.length % 4) b64 += '=';
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      const json = new TextDecoder().decode(bytes);
+      const compact = JSON.parse(json);
+      if (!Array.isArray(compact)) throw new Error('Ungültige Daten');
+      return compact.map((item, idx) => {
+        const entry = {
+          id: 'app-' + Date.now() + '-' + idx,
+          name: String(item.n || item.name || 'App'),
+          androidPkg: String(item.p || item.androidPkg || ''),
+          iosUrl: String(item.i || item.iosUrl || ''),
+          webUrl: String(item.w || item.webUrl || ''),
+          icon: String(item.c || item.icon || '')
+        };
+        if (!entry.icon) entry.icon = resolveAutoIconUrl(entry);
+        return entry;
+      });
+    }
+
+    function buildShareUrl() {
+      const base = location.href.split('#')[0];
+      return `${base}#apps=${encodeSharePayload(apps)}`;
+    }
+
+    function clearUrlHash() {
+      try {
+        history.replaceState(null, '', location.pathname + location.search);
+      } catch (e) {
+        location.hash = '';
+      }
+    }
+
+    function checkUrlHashForSharedApps() {
+      const hash = location.hash || '';
+      if (!hash.startsWith('#apps=')) return;
+      const token = hash.slice(6).trim();
+      if (!token) return;
+      try {
+        const imported = decodeSharePayload(token);
+        if (imported.length === 0) return;
+
+        if (apps.length === 0) {
+          apps = imported;
+          saveApps();
+          clearUrlHash();
+          showToast(`${imported.length} App(s) übernommen!`);
+        } else {
+          pendingSharedApps = imported;
+          document.getElementById('url-import-info').textContent =
+            `Der Link enthält ${imported.length} App(s). Möchtest du deine vorhandenen ${apps.length} App(s) ersetzen oder die neuen hinzufügen?`;
+          urlImportModal.classList.add('open');
+        }
+      } catch (e) {
+        clearUrlHash();
+        showToast('Geteilter Link ungültig');
+      }
+    }
+
+    const ua = navigator.userAgent || '';
+    const isAndroid = /Android/i.test(ua);
+    const isIOS = /iPhone|iPad|iPod/i.test(ua) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+    function buildAndroidUrl(pkg) {
+      const p = (pkg || '').trim();
+      if (!p) return '';
+      return `intent://#Intent;package=${p};action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end;`;
+    }
+
+    function buildIOSUrl(iosVal) {
+      const val = (iosVal || '').trim();
+      if (!val) return '';
+      return /^\d+$/.test(val) ? `https://apps.apple.com/de/app/id${val}` : val;
+    }
+
+    function buildWebUrl(app) {
+      if (app.webUrl && app.webUrl.trim()) {
+        const w = app.webUrl.trim();
+        return /^https?:\/\//i.test(w) ? w : `https://${w}`;
+      }
+      if (app.androidPkg && app.androidPkg.trim()) {
+        return `https://play.google.com/store/apps/details?id=${app.androidPkg.trim()}`;
+      }
+      if (app.iosUrl && app.iosUrl.trim()) {
+        return buildIOSUrl(app.iosUrl);
+      }
+      return '';
+    }
+
+    function buildTargetUrl(app) {
+      if (isAndroid && app.androidPkg) return buildAndroidUrl(app.androidPkg);
+      if (isIOS && app.iosUrl) return buildIOSUrl(app.iosUrl);
+      return buildWebUrl(app) || '#';
+    }
+
+    function extractDomain(urlStr) {
+      if (!urlStr) return '';
+      try {
+        const normalized = /^https?:\/\//i.test(urlStr) ? urlStr : 'https://' + urlStr;
+        return new URL(normalized).hostname;
+      } catch (e) {
+        return '';
+      }
+    }
+
+    function domainFromPackage(pkg) {
+      if (!pkg) return '';
+      const parts = pkg.trim().toLowerCase().split('.').filter(Boolean);
+      const genericTlds = ['com', 'org', 'net', 'io', 'de', 'app', 'co', 'me', 'tv', 'ai', 'free', 'ch', 'at', 'uk'];
+      if (parts.length >= 2 && genericTlds.includes(parts[0])) {
+        return `${parts[1]}.${parts[0]}`;
+      }
+      return '';
+    }
+
+    function resolveAutoIconUrl(app) {
+      let domain = extractDomain(app.webUrl);
+      if (!domain) domain = domainFromPackage(app.androidPkg);
+      if (!domain && app.name) {
+        const clean = app.name.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (clean.length >= 2) domain = `${clean}.com`;
+      }
+      return domain ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128` : '';
+    }
+
+    function getFallbackIcon(name) {
+      const letter = (name || '?').trim().charAt(0).toUpperCase();
+      return `data:image/svg+xml;utf8,` + encodeURIComponent(`
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+          <rect width="100" height="100" fill="#334155"/>
+          <text x="50" y="67" font-family="sans-serif" font-weight="700" font-size="50" fill="#a3e635" text-anchor="middle">${letter}</text>
+        </svg>
+      `);
+    }
+
+    function updateModalLogoPreview() {
+      const iconVal = document.getElementById('app-icon').value.trim();
+      const nameVal = document.getElementById('app-name').value.trim();
+      const fallback = getFallbackIcon(nameVal);
+      modalLogoPreview.onerror = () => { modalLogoPreview.src = fallback; };
+      modalLogoPreview.src = iconVal || fallback;
+    }
+
+    // --- Auto-Daten Lookup (Apple iTunes Search API) ---
+    function jsonpRequest(url) {
+      return new Promise((resolve, reject) => {
+        const cbName = 'itunes_cb_' + Date.now() + '_' + Math.floor(Math.random() * 10000);
+        const script = document.createElement('script');
+        const timer = setTimeout(() => {
+          cleanup();
+          reject(new Error('Timeout'));
+        }, 6500);
+
+        function cleanup() {
+          clearTimeout(timer);
+          delete window[cbName];
+          if (script.parentNode) script.parentNode.removeChild(script);
+        }
+
+        window[cbName] = (data) => {
+          cleanup();
+          resolve(data);
+        };
+
+        script.src = `${url}&callback=${cbName}`;
+        script.onerror = () => {
+          cleanup();
+          reject(new Error('Netzwerkfehler'));
+        };
+        document.body.appendChild(script);
+      });
+    }
+
+    function buildSearchTerms(name, pkg) {
+      const terms = [];
+      if (name && name.trim()) terms.push(name.trim());
+      if (pkg && pkg.trim()) {
+        const ignore = new Set(['com', 'org', 'net', 'io', 'de', 'app', 'android', 'droid', 'mobile', 'client', 'messenger', 'free', 'lite', 'pro']);
+        const parts = pkg.trim().toLowerCase().split('.').filter(p => p.length > 2 && !ignore.has(p));
+        if (parts.length > 0) terms.push(parts.join(' '));
+      }
+      return [...new Set(terms)];
+    }
+
+    async function autoFillAppMetadata() {
+      const nameInput = document.getElementById('app-name');
+      const pkgInput = document.getElementById('app-pkg');
+      const iosInput = document.getElementById('app-ios');
+      const webInput = document.getElementById('app-web');
+      const iconInput = document.getElementById('app-icon');
+      const btn = document.getElementById('auto-fill-btn');
+
+      const nameVal = nameInput.value.trim();
+      const pkgVal = pkgInput.value.trim();
+
+      if (!nameVal && !pkgVal) {
+        statusEl.textContent = 'Bitte zuerst App-Name oder Android Package Name eingeben.';
+        return;
+      }
+
+      btn.disabled = true;
+      statusEl.textContent = 'Suche App-Daten...';
+
+      const terms = buildSearchTerms(nameVal, pkgVal);
+      let bestMatch = null;
+
+      for (const term of terms) {
+        try {
+          const url = `https://itunes.apple.com/search?term=${encodeURIComponent(term)}&entity=software&country=de&limit=5`;
+          const data = await jsonpRequest(url);
+          if (data && Array.isArray(data.results) && data.results.length > 0) {
+            const lowerName = nameVal.toLowerCase();
+            bestMatch = data.results.find(r => r.trackName && r.trackName.toLowerCase() === lowerName)
+              || data.results.find(r => r.trackName && lowerName && r.trackName.toLowerCase().includes(lowerName))
+              || data.results[0];
+            if (bestMatch) break;
+          }
+        } catch (e) {}
+      }
+
+      let foundAnything = false;
+
+      if (bestMatch) {
+        if (!nameVal && bestMatch.trackName) {
+          nameInput.value = bestMatch.trackName;
+        }
+        if (!iosInput.value.trim() && bestMatch.trackViewUrl) {
+          iosInput.value = bestMatch.trackViewUrl.split('?')[0];
+          foundAnything = true;
+        }
+        if (!webInput.value.trim() && bestMatch.sellerUrl) {
+          webInput.value = bestMatch.sellerUrl;
+          foundAnything = true;
+        }
+        if (!iconInput.value.trim()) {
+          const art = bestMatch.artworkUrl512 || bestMatch.artworkUrl100 || bestMatch.artworkUrl60;
+          if (art) {
+            iconInput.value = art;
+            foundAnything = true;
+          }
+        }
+      }
+
+      if (!webInput.value.trim() && pkgVal) {
+        const d = domainFromPackage(pkgVal);
+        if (d) {
+          webInput.value = `https://${d}`;
+          foundAnything = true;
+        }
+      }
+
+      if (!iconInput.value.trim()) {
+        const fallbackLogo = resolveAutoIconUrl({
+          name: nameInput.value.trim(),
+          androidPkg: pkgVal,
+          webUrl: webInput.value.trim()
+        });
+        if (fallbackLogo) {
+          iconInput.value = fallbackLogo;
+          foundAnything = true;
+        }
+      }
+
+      updateModalLogoPreview();
+      btn.disabled = false;
+      statusEl.textContent = foundAnything
+        ? '✓ Daten gefunden und eingetragen!'
+        : 'Keine weiteren Daten gefunden – bitte manuell ergänzen.';
+    }
+
+    document.getElementById('auto-fill-btn').addEventListener('click', autoFillAppMetadata);
+    document.getElementById('app-icon').addEventListener('input', updateModalLogoPreview);
+    document.getElementById('app-name').addEventListener('input', updateModalLogoPreview);
+
+    // --- Einzelne Test-Buttons im Bearbeiten-Fenster ---
+    function getDraftApp() {
+      return {
+        name: document.getElementById('app-name').value.trim() || 'Test-App',
+        androidPkg: document.getElementById('app-pkg').value.trim(),
+        iosUrl: document.getElementById('app-ios').value.trim(),
+        webUrl: document.getElementById('app-web').value.trim()
+      };
+    }
+
+    document.getElementById('test-android-btn').addEventListener('click', () => {
+      const draft = getDraftApp();
+      const url = buildAndroidUrl(draft.androidPkg);
+      if (!url) {
+        previewUrlEl.textContent = '⚠️ Bitte zuerst einen Android Package Name eintragen.';
+        return;
+      }
+      previewUrlEl.textContent = `Android-Intent: ${url}`;
+      window.open(url, '_blank');
+    });
+
+    document.getElementById('test-ios-btn').addEventListener('click', () => {
+      const draft = getDraftApp();
+      const url = buildIOSUrl(draft.iosUrl);
+      if (!url) {
+        previewUrlEl.textContent = '⚠️ Bitte zuerst eine iOS App-Store-URL oder ID eintragen.';
+        return;
+      }
+      previewUrlEl.textContent = `iOS-Link: ${url}`;
+      window.open(url, '_blank', 'noopener');
+    });
+
+    document.getElementById('test-web-btn').addEventListener('click', () => {
+      const draft = getDraftApp();
+      const url = buildWebUrl(draft);
+      if (!url) {
+        previewUrlEl.textContent = '⚠️ Bitte zuerst eine Web-Fallback URL (oder Package/iOS-ID) eintragen.';
+        return;
+      }
+      previewUrlEl.textContent = `Web-Fallback: ${url}`;
+      window.open(url, '_blank', 'noopener');
+    });
+
+    // --- Grid Rendering ---
+    function render() {
+      grid.innerHTML = '';
+
+      if (apps.length === 0) {
+        grid.innerHTML = `
+          <div class="empty-state">
+            Noch keine Apps vorhanden.<br>
+            Tippe oben rechts auf <strong>+ App</strong>, um deinen ersten Button anzulegen.
+          </div>
+        `;
+        return;
+      }
+
+      apps.forEach((app, index) => {
+        const card = document.createElement('div');
+        card.className = 'app-card';
+        card.draggable = editMode;
+
+        const fallback = getFallbackIcon(app.name);
+        const autoIcon = resolveAutoIconUrl(app);
+        const iconSrc = (app.icon && app.icon.trim()) ? app.icon.trim() : (autoIcon || fallback);
+        const href = buildTargetUrl(app);
+
+        card.innerHTML = `
+          <a class="app-link" href="${href}" ${editMode ? 'onclick="return false;"' : ''}>
+            <div class="app-logo">
+              <img src="${iconSrc}" alt="${app.name}">
+            </div>
+            <span class="app-name">${app.name}</span>
+          </a>
+          <div class="edit-controls">
+            <div class="edit-row">
+              <button type="button" class="btn-icon" data-action="left" title="Nach links">◀</button>
+              <button type="button" class="btn-icon" data-action="right" title="Nach rechts">▶</button>
+            </div>
+            <div class="edit-row">
+              <button type="button" class="btn-icon" data-action="edit" title="Bearbeiten">✏️</button>
+              <button type="button" class="btn-icon btn-danger" data-action="delete" title="Löschen">🗑️</button>
+            </div>
+          </div>
+        `;
+
+        const img = card.querySelector('img');
+        img.onerror = function () {
+          if (autoIcon && this.src !== autoIcon && this.src !== fallback) {
+            this.src = autoIcon;
+          } else {
+            this.onerror = null;
+            this.src = fallback;
+          }
+        };
+
+        card.querySelector('[data-action="left"]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          moveApp(index, -1);
+        });
+        card.querySelector('[data-action="right"]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          moveApp(index, 1);
+        });
+        card.querySelector('[data-action="edit"]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          openEditModal(app.id);
+        });
+        card.querySelector('[data-action="delete"]').addEventListener('click', (e) => {
+          e.stopPropagation();
+          deleteApp(app.id);
+        });
+
+        card.addEventListener('dragstart', () => {
+          draggedIndex = index;
+          card.classList.add('dragging');
+        });
+        card.addEventListener('dragend', () => {
+          card.classList.remove('dragging');
+          document.querySelectorAll('.app-card').forEach(c => c.classList.remove('drag-over'));
+        });
+        card.addEventListener('dragover', (e) => {
+          if (!editMode) return;
+          e.preventDefault();
+          card.classList.add('drag-over');
+        });
+        card.addEventListener('dragleave', () => card.classList.remove('drag-over'));
+        card.addEventListener('drop', (e) => {
+          e.preventDefault();
+          if (draggedIndex === null || draggedIndex === index) return;
+          const moved = apps.splice(draggedIndex, 1)[0];
+          apps.splice(index, 0, moved);
+          draggedIndex = null;
+          saveApps();
+          render();
+        });
+
+        grid.appendChild(card);
+      });
+    }
+
+    function moveApp(index, direction) {
+      const target = index + direction;
+      if (target < 0 || target >= apps.length) return;
+      const temp = apps[index];
+      apps[index] = apps[target];
+      apps[target] = temp;
+      saveApps();
+      render();
+    }
+
+    function deleteApp(id) {
+      apps = apps.filter(a => a.id !== id);
+      saveApps();
+      render();
+      showToast('App gelöscht');
+    }
+
+    function openEditModal(id) {
+      const app = apps.find(a => a.id === id);
+      if (!app) return;
+      document.getElementById('modal-title').textContent = 'App bearbeiten';
+      document.getElementById('app-id').value = app.id;
+      document.getElementById('app-name').value = app.name;
+      document.getElementById('app-pkg').value = app.androidPkg || '';
+      document.getElementById('app-ios').value = app.iosUrl || '';
+      document.getElementById('app-web').value = app.webUrl || '';
+      document.getElementById('app-icon').value = app.icon || resolveAutoIconUrl(app);
+      statusEl.textContent = '';
+      previewUrlEl.textContent = '';
+      updateModalLogoPreview();
+      appModal.classList.add('open');
+    }
+
+    function closeAppModal() {
+      appModal.classList.remove('open');
+    }
+
+    document.getElementById('add-app-btn').addEventListener('click', () => {
+      form.reset();
+      document.getElementById('app-id').value = '';
+      document.getElementById('modal-title').textContent = 'Neue App hinzufügen';
+      statusEl.textContent = '';
+      previewUrlEl.textContent = '';
+      updateModalLogoPreview();
+      appModal.classList.add('open');
+    });
+
+    document.getElementById('cancel-modal').addEventListener('click', closeAppModal);
+    document.getElementById('close-app-modal-x').addEventListener('click', closeAppModal);
+
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const id = document.getElementById('app-id').value;
+      const existing = apps.find(a => a.id === id);
+
+      const name = document.getElementById('app-name').value.trim();
+      const androidPkg = document.getElementById('app-pkg').value.trim();
+      const iosUrl = document.getElementById('app-ios').value.trim();
+      const webUrl = document.getElementById('app-web').value.trim();
+      let customIcon = document.getElementById('app-icon').value.trim();
+
+      if (!customIcon) {
+        customIcon = resolveAutoIconUrl({ name, androidPkg, webUrl });
+      }
+
+      const entry = {
+        id: id || 'app-' + Date.now(),
+        name,
+        androidPkg,
+        iosUrl,
+        webUrl,
+        icon: customIcon
+      };
+
+      if (existing) {
+        Object.assign(existing, entry);
+        showToast('Änderungen gespeichert');
+      } else {
+        apps.push(entry);
+        showToast('App hinzugefügt');
+      }
+
+      saveApps();
+      render();
+      closeAppModal();
+    });
+
+    toggleEditBtn.addEventListener('click', () => {
+      editMode = !editMode;
+      document.body.classList.toggle('edit-mode', editMode);
+      toggleEditBtn.textContent = editMode ? 'Fertig' : 'Sortieren';
+      render();
+    });
+
+    // --- Teilen & Backup ---
+    const nativeShareBtn = document.getElementById('native-share-btn');
+    if (navigator.share) nativeShareBtn.style.display = 'inline-block';
+
+    document.getElementById('backup-btn').addEventListener('click', () => {
+      document.getElementById('import-text').value = '';
+      backupModal.classList.add('open');
+    });
+
+    document.getElementById('close-backup-modal-x').addEventListener('click', () => {
+      backupModal.classList.remove('open');
+    });
+
+    document.getElementById('copy-share-link-btn').addEventListener('click', async () => {
+      const shareUrl = buildShareUrl();
+      try {
+        await navigator.clipboard.writeText(shareUrl);
+        showToast('Teilbarer Link kopiert!');
+      } catch (e) {
+        prompt('Kopiere diesen Link:', shareUrl);
+      }
+    });
+
+    nativeShareBtn.addEventListener('click', async () => {
+      const shareUrl = buildShareUrl();
+      try {
+        await navigator.share({
+          title: 'hssw App-Liste',
+          text: 'Meine App-Buttons für hssw:',
+          url: shareUrl
+        });
+      } catch (e) {}
+    });
+
+    document.getElementById('url-import-cancel').addEventListener('click', () => {
+      pendingSharedApps = null;
+      clearUrlHash();
+      urlImportModal.classList.remove('open');
+    });
+
+    document.getElementById('url-import-merge').addEventListener('click', () => {
+      if (pendingSharedApps) {
+        apps = apps.concat(pendingSharedApps);
+        saveApps();
+        render();
+        showToast(`${pendingSharedApps.length} App(s) hinzugefügt!`);
+      }
+      pendingSharedApps = null;
+      clearUrlHash();
+      urlImportModal.classList.remove('open');
+    });
+
+    document.getElementById('url-import-replace').addEventListener('click', () => {
+      if (pendingSharedApps) {
+        apps = pendingSharedApps;
+        saveApps();
+        render();
+        showToast('App-Liste ersetzt!');
+      }
+      pendingSharedApps = null;
+      clearUrlHash();
+      urlImportModal.classList.remove('open');
+    });
+
+    document.getElementById('export-file-btn').addEventListener('click', () => {
+      const dataStr = JSON.stringify(apps, null, 2);
+      const blob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hssw-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Backup-Datei heruntergeladen');
+    });
+
+    document.getElementById('export-copy-btn').addEventListener('click', async () => {
+      const dataStr = JSON.stringify(apps, null, 2);
+      try {
+        await navigator.clipboard.writeText(dataStr);
+        showToast('JSON in Zwischenablage kopiert');
+      } catch (e) {
+        document.getElementById('import-text').value = dataStr;
+        showToast('JSON unten im Textfeld angezeigt');
+      }
+    });
+
+    function processImport(rawJson) {
+      try {
+        const parsed = JSON.parse(rawJson);
+        if (!Array.isArray(parsed)) throw new Error('Kein gültiges Array');
+        const cleaned = parsed.map((item, idx) => {
+          const entry = {
+            id: item.id || ('app-' + Date.now() + '-' + idx),
+            name: String(item.name || 'Unbenannt'),
+            androidPkg: String(item.androidPkg || ''),
+            iosUrl: String(item.iosUrl || ''),
+            webUrl: String(item.webUrl || ''),
+            icon: String(item.icon || '')
+          };
+          if (!entry.icon) entry.icon = resolveAutoIconUrl(entry);
+          return entry;
+        });
+        apps = cleaned;
+        saveApps();
+        render();
+        backupModal.classList.remove('open');
+        showToast(`${apps.length} App(s) importiert`);
+      } catch (err) {
+        alert('Fehler beim Import: Bitte gültiges JSON-Backup verwenden.');
+      }
+    }
+
+    document.getElementById('import-text-btn').addEventListener('click', () => {
+      const txt = document.getElementById('import-text').value.trim();
+      if (!txt) return;
+      processImport(txt);
+    });
+
+    document.getElementById('import-file-trigger').addEventListener('click', () => {
+      document.getElementById('import-file-input').click();
+    });
+
+    document.getElementById('import-file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => processImport(ev.target.result);
+      reader.readAsText(file);
+      e.target.value = '';
+    });
+
+    checkUrlHashForSharedApps();
+    render();
+  </script>
+</body>
+</html>
