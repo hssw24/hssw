@@ -425,8 +425,8 @@
       <h1>hssw</h1>
     </div>
     <div class="toolbar">
-      <button type="button" class="btn-secondary" id="backup-btn">Teilen / Backup</button>
-      <button type="button" class="btn-secondary" id="toggle-edit-btn">Sortieren</button>
+      <button type="button" class="btn-secondary" id="backup-btn">Backup</button>
+      <button type="button" class="btn-secondary" id="toggle-edit-btn">Edit</button>
       <button type="button" class="btn-primary" id="add-app-btn">+ App</button>
     </div>
   </header>
@@ -1192,7 +1192,7 @@
     toggleEditBtn.addEventListener('click', () => {
       editMode = !editMode;
       document.body.classList.toggle('edit-mode', editMode);
-      toggleEditBtn.textContent = editMode ? 'Fertig' : 'Sortieren';
+      toggleEditBtn.textContent = editMode ? 'Fertig' : 'Edit';
       render();
     });
 
